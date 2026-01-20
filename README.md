@@ -6,7 +6,7 @@ classDiagram: https://lucid.app/lucidchart/b7ea6733-79de-4f6f-9dfb-e04d91a4da64/
 # when you download this repo run:  (setup if you are using powershell)
 
 ## run commands in the base directory /
-python -m venv .
+python -m venv .\n
 .\Scripts\Activate.ps1                          
 
 ## to install requirement, run:
