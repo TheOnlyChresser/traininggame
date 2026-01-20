@@ -7,7 +7,7 @@ classDiagram: https://lucid.app/lucidchart/b7ea6733-79de-4f6f-9dfb-e04d91a4da64/
 
 ## run commands in the base directory /
 ~~~
-python -m venv .\n
+python -m venv .
 .\Scripts\Activate.ps1                          
 ~~~
 
