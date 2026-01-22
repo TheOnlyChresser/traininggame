@@ -350,6 +350,23 @@ all_styles = {
     }
 }
 
+return_types = {
+    "font": weights,
+    "size": sizes,
+    "color": colors
+}
+
+for return_type in return_types:
+    print(return_type)
+
+class Screen:
+    def __init__(self, width, height, surface):
+        self.width = width
+        self.height = height
+        self.surface = surface
+        pygame.init()
+        self.surface = pygame.display.set_mode((self.width, self.height))
+
 class UIBase:
     def __init__(self, box, styles, parent, inherit):
         self.box = box
@@ -359,17 +376,24 @@ class UIBase:
     def add_child(self):
         pass
     def get_computed_styles(self, category, returned):
-        all_styles = []
-        for style in self.styles:
-            parse_styles = style.split("-")
-            temp_styles = all_styles
-
-            for style in parse_styles:
-                if style in temp_styles:
-                    all_styles.append(temp_styles[style])
-
-            return temp_styles
-        return all_styles
+        returned_style = ""
+        parse_styles = self.styles.split(" ")
+        for parse_style in parse_styles:
+            more_parsed_style = parse_style.split("-")
+            if more_parsed_style[0] == "size":
+                more_parsed_style.remove("size")
+            if more_parsed_style[0] == category:
+                if more_parsed_style[1] == returned:
+                    returned_style = all_styles[category][more_parsed_style[1]]
+                    return returned_style
+                for return_type in return_types:
+                    if more_parsed_style[1] == return_types[return_type] and returned == return_type:
+                        if returned == "color":
+                            returned_style = colors[more_parsed_style[1]][more_parsed_style[2]]
+                            return returned_style
+                        else:
+                            returned_style = return_types[return_type][more_parsed_style[1]]
+        return returned_style
 
 
 class UIText(UIBase):
@@ -387,7 +411,11 @@ class UIDiv(UIBase):
         super().__init__(styles, parent, inherit)
         self.children = children
 
-    def render(self):
+    def render(self, screen):
         box_w = self.get_computed_styles("size", "w")
         box_h = self.get_computed_styles("size", "h")
-        return pygame.Surface((box_w, box_h))
+        box_bg = self.get_computed_styles("bg", "color")
+        return pygame.draw.rect(screen.surface, (box_w, box_h))
+
+
+text = UIText("text", "text-red-500 text-5xl bg-red-500", None, None, "Hello World", "Arial")
