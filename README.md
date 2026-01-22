@@ -15,4 +15,5 @@ pip install -r requirements.txt
 ## run befor commit, if using new module
 pipreqs --force --ignore .\lib,.\Scripts --encoding=utf8 .                       (run in base directory /)
 
-
+## pipreqs install command
+pip install pipreqs
