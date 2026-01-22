@@ -1,3 +1,5 @@
+import pygame
+
 colors = {
     "red": {
         "50": "#fef2f2",
@@ -287,16 +289,16 @@ colors = {
     }
 }
 sizes = {
-    "xs": "12px",
-    "sm": "14px",
-    "md": "16px",
-    "lg": "18px",
-    "xl": "20px",
-    "2xl": "24px",
-    "3xl": "30px",
-    "4xl": "36px",
-    "5xl": "48px",
-    "6xl": "60px",
+    "xs": "12",
+    "sm": "14",
+    "md": "16",
+    "lg": "18",
+    "xl": "20",
+    "2xl": "24",
+    "3xl": "30",
+    "4xl": "36",
+    "5xl": "48",
+    "6xl": "60",
 }
 
 weights = {
@@ -356,15 +358,18 @@ class UIBase:
         self.inherit = inherit
     def add_child(self):
         pass
-    def get_computed_styles(self):
-        parse_styles = self.styles.split("-")
-        temp_styles = all_styles
+    def get_computed_styles(self, category, returned):
+        all_styles = []
+        for style in self.styles:
+            parse_styles = style.split("-")
+            temp_styles = all_styles
 
-        for style in parse_styles:
-            if style in temp_styles:
-                temp_styles = temp_styles[style]
+            for style in parse_styles:
+                if style in temp_styles:
+                    all_styles.append(temp_styles[style])
 
-        return temp_styles
+            return temp_styles
+        return all_styles
 
 
 class UIText(UIBase):
@@ -374,13 +379,15 @@ class UIText(UIBase):
         self.font = font
 
     def render(self):
-        pass
+        font = pygame.font.SysFont(self.font, self.get_computed_styles("text", "size"))
+        return font.render(self.text, True, self.get_computed_styles("text", "color"))
 
 class UIDiv(UIBase):
-    def __init__(self, box, styles, parent, inherit, children):
-        super().__init__(box, styles, parent, inherit)
+    def __init__(self, styles, parent, inherit, children):
+        super().__init__(styles, parent, inherit)
         self.children = children
 
     def render(self):
-        pass
-
+        box_w = self.get_computed_styles("size", "w")
+        box_h = self.get_computed_styles("size", "h")
+        return pygame.Surface((box_w, box_h))
