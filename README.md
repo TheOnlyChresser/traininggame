@@ -6,14 +6,21 @@ classDiagram: https://lucid.app/lucidchart/b7ea6733-79de-4f6f-9dfb-e04d91a4da64/
 # when you download this repo run:  (setup if you are using powershell)
 
 ## run commands in the base directory /
+~~~
 python -m venv .
 .\Scripts\Activate.ps1                          
+~~~
 
 ## to install requirement, run:
+~~~
 pip install -r requirements.txt
-
+~~~
 ## run befor commit, if using new module
+~~~
 pipreqs --force --ignore .\lib,.\Scripts --encoding=utf8 .                       (run in base directory /)
+~~~
 
 ## pipreqs install command
-pip install pipreqs
+~~~
+pip install pipreqs 
+~~~                                                             
