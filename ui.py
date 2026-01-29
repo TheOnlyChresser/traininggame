@@ -334,43 +334,51 @@ def parse_classes(class_string):
         "font_size": None,
         "font_family": None,
     }
+    hover_styles = {}
 
     for parsed_class in class_string.split():
-        parts = parsed_class.split("-")
+        is_hover = parsed_class.startswith("hover:")
+        class_to_parse = parsed_class[6:] if is_hover else parsed_class
+        parts = class_to_parse.split("-")
 
-        if parsed_class == "flex":
-            styles["display"] = "flex"
-        elif parsed_class == "block":
-            styles["display"] = "block"
-        elif parsed_class == "fixed":
-            styles["position"] = "fixed"
+        def set_style(dict, key, value):
+            dict[key] = value
+
+        target = hover_styles if is_hover else styles
+
+        if class_to_parse == "flex":
+            set_style(target, "display", "flex")
+        elif class_to_parse == "block":
+            set_style(target, "display", "block")
+        elif class_to_parse == "fixed":
+            set_style(target, "position", "fixed")
 
         elif parts[0] == "justify":
-            styles["justify"] = parts[1]
+            set_style(target, "justify", parts[1])
         elif parts[0] == "items":
-            styles["items"] = parts[1]
+            set_style(target, "items", parts[1])
 
         elif parts[0] == "w":
-            styles["width"] = int(parts[1])
+            set_style(target, "width", int(parts[1]))
         elif parts[0] == "h":
-            styles["height"] = int(parts[1])
+            set_style(target, "height", int(parts[1]))
 
         elif parts[0] in ("top", "left", "right", "bottom"):
-            styles[parts[0]] = int(parts[1])
+            set_style(target, parts[0], int(parts[1]))
 
         elif parts[0] == "bg":
             if parts[1] in colors and parts[2] in colors[parts[1]] and colors[parts[1]][parts[2]]:
-                styles["background"] = hex_to_rgb(colors[parts[1]][parts[2]])
+                set_style(target, "background", hex_to_rgb(colors[parts[1]][parts[2]]))
 
         elif parts[0] == "text":
             if parts[1] in colors and parts[2] in colors[parts[1]] and colors[parts[1]][parts[2]]:
-                styles["color"] = hex_to_rgb(colors[parts[1]][parts[2]])
+                set_style(target, "color", hex_to_rgb(colors[parts[1]][parts[2]]))
             elif parts[1] in sizes:
-                styles["font_size"] = int(sizes[parts[1]])
+                set_style(target, "font_size", int(sizes[parts[1]]))
         elif parts[0] == "font":
-            styles["font_family"] = parts[1].capitalize()
+            set_style(target, "font_family", parts[1].capitalize())
 
-    return styles
+    return styles, hover_styles
 
 class Screen:
     def __init__(self, width, height, surface):
@@ -386,10 +394,19 @@ class UIBase:
         self.styles = styles
         self.parent = parent
         self.inherit = inherit
-        self.computed = parse_classes(styles)
+        self.computed, self.hover_styles = parse_classes(styles)
+        self.is_hovered = False
         self.children = []
         if parent and hasattr(parent, "children"):
             parent.children.append(self)
+
+    def update_hover(self, mouse_position):
+        x, y, w, h = self.box
+        self.is_hovered = (x <= mouse_position[0] <= x + w and y <= mouse_position[1] <= y + h)
+        if self.is_hovered and self.hover_styles:
+            self.computed.update(self.hover_styles)
+        elif not self.is_hovered:
+            self.computed = parse_classes(self.styles)[0]
 
     def add_child(self, child):
         self.children.append(child)
@@ -404,6 +421,9 @@ class UIText(UIBase):
         super().__init__(box, styles, parent, inherit)
         self.text = text
         self.font = font or self.get_computed_style("font_family", "Arial")
+
+    def handle_hover(self, mouse_position):
+        self.update_hover(mouse_position)
 
     def render(self):
         font_size = self.get_computed_style("font_size", 16)
