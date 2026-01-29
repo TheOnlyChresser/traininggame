@@ -333,8 +333,20 @@ def parse_classes(class_string):
         "color": None,
         "font_size": None,
         "font_family": None,
+        "radius": None,
     }
     hover_styles = {}
+
+    radius_sizes = {
+        "none": 0,
+        "sm": 6,
+        "md": 12,
+        "lg": 18,
+        "xl": 28,
+        "2xl": 40,
+        "3xl": 60,
+        "full": 999,
+    }
 
     for parsed_class in class_string.split():
         is_hover = parsed_class.startswith("hover:")
@@ -377,6 +389,14 @@ def parse_classes(class_string):
                 set_style(target, "font_size", int(sizes[parts[1]]))
         elif parts[0] == "font":
             set_style(target, "font_family", parts[1].capitalize())
+
+        elif parts[0] == "rounded":
+            if len(parts) == 2 and parts[1] in radius_sizes:
+                set_style(target, "radius", radius_sizes[parts[1]])
+            elif len(parts) == 2 and parts[1].isdigit():
+                set_style(target, "radius", int(parts[1]))
+            elif len(parts) == 1:
+                set_style(target, "radius", radius_sizes["md"])
 
     return styles, hover_styles
 
@@ -435,12 +455,37 @@ class UIText(UIBase):
         return font.render(self.text, True, color)
 
 class UIDiv(UIBase):
-    def __init__(self, styles, parent, inherit, children):
-        super().__init__(styles, parent, inherit)
-        self.children = children
+    def __init__(self, box, styles, parent, inherit, children=None, on_click=None, radius=None):
+        super().__init__(box, styles, parent, inherit)
+        self.children = children if children is not None else []
+        self.on_click = on_click
+        self.radius = self.get_computed_style("radius", 18) if radius is None else radius
 
-    def render(self, screen):
-        box_w = self.get_computed_styles("size", "w")
-        box_h = self.get_computed_styles("size", "h")
-        box_bg = self.get_computed_styles("bg", "color")
-        return pygame.draw.rect(screen.surface, (box_w, box_h))
+    def render(self, surface):
+        bg = self.get_computed_style("background", None)
+        if bg:
+            pygame.draw.rect(surface, bg, self.box, border_radius=self.radius)
+        for child in self.children:
+            if hasattr(child, "render"):
+                child_box = getattr(child, "box", None)
+                if child_box:
+                    child_x = self.box[0] + (self.box[2] - child_box[2]) // 2
+                    child_y = self.box[1] + (self.box[3] - child_box[3]) // 2
+                else:
+                    child_x, child_y = self.box[0], self.box[1]
+
+                if isinstance(child, UIText):
+                    rendered = child.render()
+                    surface.blit(rendered, (child_x, child_y))
+                else:
+                    child.render(surface)
+
+    def handle_event(self, event):
+        if self.on_click and event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_position = pygame.mouse.get_pos()
+            x, y, w, h = self.box
+            if x <= mouse_position[0] <= x + w and y <= mouse_position[1] <= y + h:
+                self.on_click()
+        for child in self.children:
+            if hasattr(child, "handle_event"):
+                child.handle_event(event)
