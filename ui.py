@@ -312,52 +312,65 @@ weights = {
     "extrabold": "800",
     "black": "900",
 }
+#chatgpt kode
+def hex_to_rgb(hex_color):
+    hex_color = hex_color.lstrip("#")
+    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-all_styles = {
-    "text": {
-        colors,
-        sizes
-    },
-    "bg": {
-        colors
-    },
-    "border": {
-        colors
-    },
-    "p": {
-        sizes
-    },
-    "m": {
-        sizes
-    },
-    "rounded": {
-        sizes
-    },
-    "shadow": {
-        sizes
-    },
-    "backdrop-blur": {
-        sizes
-    },
-    "w": {
-        sizes
-    },
-    "h": {
-        sizes
-    },
-    "font": {
-        weights
+def parse_classes(class_string):
+    styles = {
+        "display": "flex",
+        "position": "relative",
+        "justify": "start",
+        "items": "start",
+        "width": None,
+        "height": None,
+        "top": None,
+        "left": None,
+        "right": None,
+        "bottom": None,
+        "background": None,
+        "color": None,
+        "font_size": None,
+        "font_family": None,
     }
-}
 
-return_types = {
-    "font": weights,
-    "size": sizes,
-    "color": colors
-}
+    for parsed_class in class_string.split():
+        parts = parsed_class.split("-")
 
-for return_type in return_types:
-    print(return_type)
+        if parsed_class == "flex":
+            styles["display"] = "flex"
+        elif parsed_class == "block":
+            styles["display"] = "block"
+        elif parsed_class == "fixed":
+            styles["position"] = "fixed"
+
+        elif parts[0] == "justify":
+            styles["justify"] = parts[1]
+        elif parts[0] == "items":
+            styles["items"] = parts[1]
+
+        elif parts[0] == "w":
+            styles["width"] = int(parts[1])
+        elif parts[0] == "h":
+            styles["height"] = int(parts[1])
+
+        elif parts[0] in ("top", "left", "right", "bottom"):
+            styles[parts[0]] = int(parts[1])
+
+        elif parts[0] == "bg":
+            if parts[1] in colors and parts[2] in colors[parts[1]] and colors[parts[1]][parts[2]]:
+                styles["background"] = hex_to_rgb(colors[parts[1]][parts[2]])
+
+        elif parts[0] == "text":
+            if parts[1] in colors and parts[2] in colors[parts[1]] and colors[parts[1]][parts[2]]:
+                styles["color"] = hex_to_rgb(colors[parts[1]][parts[2]])
+            elif parts[1] in sizes:
+                styles["font_size"] = int(sizes[parts[1]])
+        elif parts[0] == "font":
+            styles["font_family"] = parts[1].capitalize()
+
+    return styles
 
 class Screen:
     def __init__(self, width, height, surface):
@@ -373,38 +386,33 @@ class UIBase:
         self.styles = styles
         self.parent = parent
         self.inherit = inherit
-    def add_child(self):
-        pass
-    def get_computed_styles(self, category, returned):
-        returned_style = ""
-        parse_styles = self.styles.split(" ")
-        for parse_style in parse_styles:
-            more_parsed_style = parse_style.split("-")
-            if more_parsed_style[0] == "size":
-                more_parsed_style.remove("size")
-            if more_parsed_style[0] == category:
-                if more_parsed_style[1] == returned:
-                    returned_style = all_styles[category][more_parsed_style[1]]
-                    return returned_style
-                for return_type in return_types:
-                    if more_parsed_style[1] == return_types[return_type] and returned == return_type:
-                        if returned == "color":
-                            returned_style = colors[more_parsed_style[1]][more_parsed_style[2]]
-                            return returned_style
-                        else:
-                            returned_style = return_types[return_type][more_parsed_style[1]]
-        return returned_style
+        self.computed = parse_classes(styles)
+        self.children = []
+        if parent and hasattr(parent, "children"):
+            parent.children.append(self)
+
+    def add_child(self, child):
+        self.children.append(child)
+
+    def get_computed_style(self, key, default=None):
+        return self.computed.get(key, default)
+
 
 
 class UIText(UIBase):
-    def __init__(self, box, styles, parent, inherit, text, font):
+    def __init__(self, box, styles, parent, inherit, text, font=None):
         super().__init__(box, styles, parent, inherit)
         self.text = text
-        self.font = font
+        self.font = font or self.get_computed_style("font_family", "Arial")
 
     def render(self):
-        font = pygame.font.SysFont(self.font, self.get_computed_styles("text", "size"))
-        return font.render(self.text, True, self.get_computed_styles("text", "color"))
+        font_size = self.get_computed_style("font_size", 16)
+        color = self.get_computed_style("color", (255, 255, 255))
+        # fikser fejl hvis ikke rgb
+        if not (isinstance(color, tuple) and len(color) == 3 and all(isinstance(c, int) and 0 <= c <= 255 for c in color)):
+            color = (255, 255, 255)
+        font = pygame.font.SysFont(self.font, font_size)
+        return font.render(self.text, True, color)
 
 class UIDiv(UIBase):
     def __init__(self, styles, parent, inherit, children):
@@ -416,6 +424,3 @@ class UIDiv(UIBase):
         box_h = self.get_computed_styles("size", "h")
         box_bg = self.get_computed_styles("bg", "color")
         return pygame.draw.rect(screen.surface, (box_w, box_h))
-
-
-text = UIText("text", "text-red-500 text-5xl bg-red-500", None, None, "Hello World", "Arial")
