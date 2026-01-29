@@ -289,46 +289,31 @@ colors = {
     }
 }
 sizes = {
-    "xs": "12",
-    "sm": "14",
-    "md": "16",
-    "lg": "18",
-    "xl": "20",
-    "2xl": "24",
-    "3xl": "30",
-    "4xl": "36",
-    "5xl": "48",
-    "6xl": "60",
+    "xs": 12,
+    "sm": 14,
+    "base": 16,
+    "lg": 18,
+    "xl": 20,
+    "2xl": 24,
+    "3xl": 30,
+    "4xl": 36,
+    "5xl": 48
 }
 
-weights = {
-    "thin": "100",
-    "extralight": "200",
-    "light": "300",
-    "normal": "400",
-    "medium": "500",
-    "semibold": "600",
-    "bold": "700",
-    "extrabold": "800",
-    "black": "900",
-}
-#chatgpt kode
 def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip("#")
-    return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
+    return tuple(int(hex_color[i:i+2],16) for i in (0,2,4))
 
 def parse_classes(class_string):
     styles = {
-        "display": "flex",
-        "position": "relative",
-        "justify": "start",
-        "items": "start",
+        "display": None,
+        "position": None,
+        "justify": None,
+        "items": None,
         "width": None,
         "height": None,
         "top": None,
         "left": None,
-        "right": None,
-        "bottom": None,
         "background": None,
         "color": None,
         "font_size": None,
@@ -338,154 +323,191 @@ def parse_classes(class_string):
     hover_styles = {}
 
     radius_sizes = {
-        "none": 0,
-        "sm": 6,
-        "md": 12,
-        "lg": 18,
-        "xl": 28,
-        "2xl": 40,
-        "3xl": 60,
-        "full": 999,
+        "none":0,
+        "sm":4,
+        "md":8,
+        "lg":12,
+        "xl":16,
+        "2xl":24,
+        "3xl":32,
+        "full":999
     }
 
-    for parsed_class in class_string.split():
-        is_hover = parsed_class.startswith("hover:")
-        class_to_parse = parsed_class[6:] if is_hover else parsed_class
-        parts = class_to_parse.split("-")
-
-        def set_style(dict, key, value):
-            dict[key] = value
-
+    for cls in class_string.split():
+        is_hover = cls.startswith("hover:")
+        cls_name = cls[6:] if is_hover else cls
         target = hover_styles if is_hover else styles
+        parts = cls_name.split("-")
 
-        if class_to_parse == "flex":
-            set_style(target, "display", "flex")
-        elif class_to_parse == "block":
-            set_style(target, "display", "block")
-        elif class_to_parse == "fixed":
-            set_style(target, "position", "fixed")
+        def set_style(key,value): target[key]=value
 
-        elif parts[0] == "justify":
-            set_style(target, "justify", parts[1])
-        elif parts[0] == "items":
-            set_style(target, "items", parts[1])
-
-        elif parts[0] == "w":
-            set_style(target, "width", int(parts[1]))
-        elif parts[0] == "h":
-            set_style(target, "height", int(parts[1]))
-
-        elif parts[0] in ("top", "left", "right", "bottom"):
-            set_style(target, parts[0], int(parts[1]))
-
-        elif parts[0] == "bg":
-            if parts[1] in colors and parts[2] in colors[parts[1]] and colors[parts[1]][parts[2]]:
-                set_style(target, "background", hex_to_rgb(colors[parts[1]][parts[2]]))
-
-        elif parts[0] == "text":
-            if parts[1] in colors and parts[2] in colors[parts[1]] and colors[parts[1]][parts[2]]:
-                set_style(target, "color", hex_to_rgb(colors[parts[1]][parts[2]]))
-            elif parts[1] in sizes:
-                set_style(target, "font_size", int(sizes[parts[1]]))
-        elif parts[0] == "font":
-            set_style(target, "font_family", parts[1].capitalize())
-
-        elif parts[0] == "rounded":
-            if len(parts) == 2 and parts[1] in radius_sizes:
-                set_style(target, "radius", radius_sizes[parts[1]])
-            elif len(parts) == 2 and parts[1].isdigit():
-                set_style(target, "radius", int(parts[1]))
-            elif len(parts) == 1:
-                set_style(target, "radius", radius_sizes["md"])
-
+        if cls_name in ("flex","block"): set_style("display",cls_name)
+        elif cls_name in ("relative","absolute","fixed"): set_style("position",cls_name)
+        elif parts[0] in ("justify","items"): set_style(parts[0],parts[1])
+        elif parts[0] in ("w","h","top","left"):
+            set_style("width" if parts[0]=="w" else parts[0], int(parts[1]) if parts[1].isdigit() else None)
+        elif parts[0]=="bg" and parts[1] in colors and parts[2] in colors[parts[1]]:
+            set_style("background",hex_to_rgb(colors[parts[1]][parts[2]]))
+        elif parts[0]=="text":
+            if parts[1] in colors and parts[2] in colors[parts[1]]:
+                set_style("color",hex_to_rgb(colors[parts[1]][parts[2]]))
+            elif parts[1] in sizes: set_style("font_size",sizes[parts[1]])
+        elif parts[0]=="font": set_style("font_family",parts[1].capitalize())
+        elif parts[0]=="rounded":
+            if len(parts)==2 and parts[1] in radius_sizes: set_style("radius",radius_sizes[parts[1]])
+            elif len(parts)==2 and parts[1].isdigit(): set_style("radius",int(parts[1]))
+            elif len(parts)==1: set_style("radius",radius_sizes["md"])
     return styles, hover_styles
 
-class Screen:
-    def __init__(self, width, height, surface):
-        self.width = width
-        self.height = height
-        self.surface = surface
-        pygame.init()
-        self.surface = pygame.display.set_mode((self.width, self.height))
-
 class UIBase:
-    def __init__(self, box, styles, parent, inherit):
-        self.box = box
-        self.styles = styles
+    def __init__(self,styles="",parent=None):
+        self.styles_str = styles
         self.parent = parent
-        self.inherit = inherit
-        self.computed, self.hover_styles = parse_classes(styles)
+        self.computed,self.hover_styles = parse_classes(styles)
         self.is_hovered = False
-        self.children = []
-        if parent and hasattr(parent, "children"):
-            parent.children.append(self)
+        self.children=[]
+        self.box=None
+        if parent: parent.children.append(self)
 
-    def update_hover(self, mouse_position):
-        x, y, w, h = self.box
-        self.is_hovered = (x <= mouse_position[0] <= x + w and y <= mouse_position[1] <= y + h)
-        if self.is_hovered and self.hover_styles:
-            self.computed.update(self.hover_styles)
-        elif not self.is_hovered:
-            self.computed = parse_classes(self.styles)[0]
+    def update_hover(self,mouse_pos):
+        if not self.box: return
+        x,y,w,h=self.box
+        self.is_hovered=(x<=mouse_pos[0]<=x+w and y<=mouse_pos[1]<=y+h)
+        if self.is_hovered: self.computed.update(self.hover_styles)
+        else: self.computed=parse_classes(self.styles_str)[0]
 
-    def add_child(self, child):
-        self.children.append(child)
+    def get_style(self,key,default=None):
+        return self.computed.get(key,default)
 
-    def get_computed_style(self, key, default=None):
-        return self.computed.get(key, default)
-
-
+    def compute_box(self):
+        parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
+        width = int(self.get_style("width") or (parent_w if self.get_style("display")=="block" else 100))
+        height = int(self.get_style("height") or 50)
+        x = int(self.get_style("left") or 0)
+        y = int(self.get_style("top") or 0)
+        self.box=(x,y,width,height)
+        for child in self.children: child.compute_box()
+        if self.get_style("height") is None and self.children:
+            total_child_height=sum(int(child.box[3]) for child in self.children if child.box and child.box[3] is not None)
+            self.box=(x,y,width,max(height,total_child_height))
+        return self.box
 
 class UIText(UIBase):
-    def __init__(self, box, styles, parent, inherit, text, font=None):
-        super().__init__(box, styles, parent, inherit)
+    def __init__(self, text, styles="", parent=None):
+        super().__init__(styles, parent)
         self.text = text
-        self.font = font or self.get_computed_style("font_family", "Arial")
+        self.font_name = self.get_style("font_family", "Arial")
 
-    def handle_hover(self, mouse_position):
-        self.update_hover(mouse_position)
+    def compute_box(self):
+        font_size = self.get_style("font_size", 16)
+        font = pygame.font.SysFont(self.font_name, font_size)
+        text_width, text_height = font.size(self.text)
+        width = self.get_style("width") or text_width
+        height = self.get_style("height") or text_height
+        x = int(self.get_style("left") or 0)
+        y = int(self.get_style("top") or 0)
+        self.box = (x, y, width, height)
+        return self.box
 
-    def render(self):
-        font_size = self.get_computed_style("font_size", 16)
-        color = self.get_computed_style("color", (255, 255, 255))
-        # fikser fejl hvis ikke rgb
-        if not (isinstance(color, tuple) and len(color) == 3 and all(isinstance(c, int) and 0 <= c <= 255 for c in color)):
-            color = (255, 255, 255)
-        font = pygame.font.SysFont(self.font, font_size)
-        return font.render(self.text, True, color)
-
-class UIDiv(UIBase):
-    def __init__(self, box, styles, parent, inherit, children=None, on_click=None, radius=None):
-        super().__init__(box, styles, parent, inherit)
-        self.children = children if children is not None else []
-        self.on_click = on_click
-        self.radius = self.get_computed_style("radius", 18) if radius is None else radius
 
     def render(self, surface):
-        bg = self.get_computed_style("background", None)
-        if bg:
-            pygame.draw.rect(surface, bg, self.box, border_radius=self.radius)
-        for child in self.children:
-            if hasattr(child, "render"):
-                child_box = getattr(child, "box", None)
-                if child_box:
-                    child_x = self.box[0] + (self.box[2] - child_box[2]) // 2
-                    child_y = self.box[1] + (self.box[3] - child_box[3]) // 2
-                else:
-                    child_x, child_y = self.box[0], self.box[1]
+        font_size = self.get_style("font_size", 16)
+        color = self.get_style("color") or (0, 0, 0)
+        font = pygame.font.SysFont(self.font_name, font_size)
+        text_surface = font.render(self.text, True, color)
+        surface.blit(text_surface, (self.box[0], self.box[1]))
 
-                if isinstance(child, UIText):
-                    rendered = child.render()
-                    surface.blit(rendered, (child_x, child_y))
-                else:
-                    child.render(surface)
+class UIDiv(UIBase):
+    def __init__(self, styles="", parent=None, children=None, on_click=None):
+        super().__init__(styles, parent)
+        self.children = children or []
+        self.on_click = on_click
+        self.radius = self.get_style("radius") or 0
+        self.flex_direction = "row" 
+
+        if "flex-col" in styles:
+            self.flex_direction = "column"
+
+    def compute_box(self):
+        parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
+        parent_h = self.parent.box[3] if self.parent and self.parent.box else 600
+
+        width = int(self.get_style("width") or (parent_w if self.get_style("display")=="block" else 100))
+        height = int(self.get_style("height") or 50)
+        x = int(self.get_style("left") or 0)
+        y = int(self.get_style("top") or 0)
+
+        self.box = (x, y, width, height)
+
+        offset_x = 0
+        offset_y = 0
+        for child in self.children:
+            child.compute_box()
+            cw = child.box[2] if child.box else 0
+            ch = child.box[3] if child.box else 0
+
+            if self.flex_direction == "row":
+                child.box = (x + offset_x, y + (height - ch)//2, cw, ch)
+                offset_x += cw + 10
+            else:
+                child.box = (x + (width - cw)//2, y + offset_y, cw, ch)
+                offset_y += ch + 10
+
+        if self.flex_direction == "row" and self.get_style("height") is None:
+            self.box = (x, y, width, max(height, max((child.box[3] for child in self.children), default=height)))
+        if self.flex_direction == "column" and self.get_style("width") is None:
+            self.box = (x, y, max(width, max((child.box[2] for child in self.children), default=width)), height)
+
+        return self.box
 
     def handle_event(self, event):
         if self.on_click and event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_position = pygame.mouse.get_pos()
+            mx, my = pygame.mouse.get_pos()
             x, y, w, h = self.box
-            if x <= mouse_position[0] <= x + w and y <= mouse_position[1] <= y + h:
+            if x <= mx <= x + w and y <= my <= y + h:
                 self.on_click()
         for child in self.children:
             if hasattr(child, "handle_event"):
                 child.handle_event(event)
+    def update_hover(self, mouse_pos):
+        if not self.box:
+            return
+        x, y, w, h = self.box
+        self.is_hovered = (x <= mouse_pos[0] <= x + w and y <= mouse_pos[1] <= y + h)
+        if self.is_hovered and self.hover_styles:
+            self.computed.update(self.hover_styles)
+        elif not self.is_hovered:
+            self.computed = parse_classes(self.styles_str)[0]
+
+        for child in self.children:
+            if hasattr(child, "update_hover"):
+                child.update_hover(mouse_pos)
+
+    def render(self, surface):
+        if not self.box:
+            self.compute_box()
+
+        bg = self.get_style("background")
+        if bg:
+            pygame.draw.rect(surface, bg, self.box, border_radius=self.radius or 0)
+
+        for child in self.children:
+            if isinstance(child, UIText):
+                x = self.box[0] + (child.box[0] or 0)
+                y = self.box[1] + (child.box[1] or 0)
+                font_size = child.get_style("font_size", 16)
+                color = child.get_style("color") or (0, 0, 0)
+                font = pygame.font.SysFont(child.font_name, font_size)
+                text_surface = font.render(child.text, True, color)
+                tx = x + (child.box[2] - text_surface.get_width()) // 2
+                ty = y + (child.box[3] - text_surface.get_height()) // 2
+                surface.blit(text_surface, (tx, ty))
+            else:
+                child.render(surface)
+
+class Screen:
+    def __init__(self,width,height):
+        pygame.init()
+        self.surface=pygame.display.set_mode((width,height))
+        self.width,self.height=width,height
+
