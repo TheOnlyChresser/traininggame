@@ -35,8 +35,8 @@ while running:
     
     menu.update_hover(mouse_position)
     menu.render(surface)
-    
-    pygame.display.flip()
-    pygame.time.Clock().tick(60)
+
+    pygame.display.update()
+
 
 pygame.quit()
