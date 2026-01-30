@@ -1,16 +1,6 @@
 import pygame
 from ui import UIDiv, UIText, Screen, colors
 
-def start_game():
-    print("Start Game clicked")
-
-def options():
-    print("Options clicked")
-
-def exit_game():
-    pygame.quit()
-    exit()
-
 screen = Screen(800, 600)
 surface = screen.surface
 pygame.display.set_caption("AI spil")
@@ -19,7 +9,7 @@ menu = UIDiv(styles="flex flex-col justify-center top-180 items-center w-800 h-6
 
 def game_button(text, on_click):
     return UIDiv(
-        styles="w-300 h-60 bg-sky-500 rounded-md hover:bg-sky-400 items-center",
+        styles="w-300 h-60 bg-sky-500 rounded-md hover:bg-sky-400 top-12 items-center flex flex-col justify-center",
         on_click=on_click,
         children=[UIText(text, styles="text-neutral-50 text-xl font-arial text-center")]
     )
