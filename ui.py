@@ -376,8 +376,9 @@ class UIBase:
         if self.is_hovered: self.computed.update(self.hover_styles)
         else: self.computed=parse_classes(self.styles_str)[0]
 
-    def get_style(self,key,default=None):
-        return self.computed.get(key,default)
+    def get_style(self, key, default=None):
+        value = self.computed.get(key)
+        return default if value is None else value
 
     def compute_box(self):
         parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
@@ -504,6 +505,72 @@ class UIDiv(UIBase):
                 surface.blit(text_surface, (tx, ty))
             else:
                 child.render(surface)
+
+
+#chatgpt har kodet UIInput med følgende prompt: "make a UIInput class based on UIDiv. it should on_click set focus: to true and take on_input where it changes a string according to what user types and the text is in UIInput.input"
+class UIInput(UIDiv):
+    def __init__(
+        self,
+        styles="",
+        parent=None,
+        placeholder="",
+        initial="",
+        on_input=None
+    ):
+        self.focused = False
+        self.input = initial
+        self.placeholder = placeholder
+        self.on_input = on_input
+
+        # text node used for rendering input contents
+        self.text_node = UIText(
+            initial or placeholder,
+            styles="text-neutral-500",
+            parent=None
+        )
+
+        super().__init__(
+            styles=styles,
+            parent=parent,
+            children=[self.text_node],
+            on_click=self._focus
+        )
+
+    def _focus(self):
+        self.focused = True
+
+    def blur(self):
+        self.focused = False
+
+    def handle_event(self, event):
+        # mouse click outside → blur
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            x, y, w, h = self.box
+            if not (x <= mx <= x + w and y <= my <= y + h):
+                self.blur()
+
+        # keyboard input only when focused
+        if self.focused and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                self.input = self.input[:-1]
+            elif event.key == pygame.K_RETURN:
+                self.blur()
+            elif event.unicode and event.unicode.isprintable():
+                self.input += event.unicode
+
+            if self.on_input:
+                self.on_input(self.input)
+
+        # update rendered text
+        if self.input:
+            self.text_node.text = self.input
+            self.text_node.computed["color"] = (0, 0, 0)
+        else:
+            self.text_node.text = self.placeholder
+            self.text_node.computed["color"] = (150, 150, 150)
+
+        super().handle_event(event)
 
 class Screen:
     def __init__(self,width,height):
