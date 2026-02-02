@@ -418,6 +418,65 @@ class UIText(UIBase):
         text_surface = font.render(self.text, True, color)
         surface.blit(text_surface, (self.box[0], self.box[1]))
 
+class UIInput(UIBase):
+    def __init__(self, placeholder="", styles="", parent=None):
+        super().__init__(styles, parent)
+        self.placeholder = placeholder
+        self.text = ""
+        self.is_focused = False
+        self.radius = self.get_style("radius") or 0
+        self.font_name = self.get_style("font_family", "Arial")
+
+    def compute_box(self):
+        parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
+        width = int(self.get_style("width") or (parent_w if self.get_style("display")=="block" else 200))
+        height = int(self.get_style("height") or 40)
+        x = int(self.get_style("left") or 0)
+        y = int(self.get_style("top") or 0)
+        self.box = (x, y, width, height)
+        return self.box
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            x, y, w, h = self.box
+            self.is_focused = (x <= mx <= x + w and y <= my <= y + h)
+        elif event.type == pygame.KEYDOWN and self.is_focused:
+            if event.key == pygame.K_BACKSPACE:
+                self.text = self.text[:-1]
+            elif event.unicode.isprintable():
+                self.text += event.unicode
+
+    def render(self, surface):
+        if not self.box:
+            self.compute_box()
+
+        x, y, w, h = self.box
+        
+        # Draw background
+        bg = self.get_style("background") or (255, 255, 255)
+        pygame.draw.rect(surface, bg, self.box, border_radius=self.radius or 0)
+        
+        # Draw border
+        border_color = self.get_style("border_color") or (200, 200, 200)
+        border_width = int(self.get_style("border_width") or 1)
+        pygame.draw.rect(surface, border_color, self.box, width=border_width, border_radius=self.radius or 0)
+        
+        # Draw text or placeholder
+        font_size = self.get_style("font_size", 16)
+        font = pygame.font.SysFont(self.font_name, font_size)
+        text_color = self.get_style("color") or (0, 0, 0)
+        placeholder_color = self.get_style("placeholder_color") or (150, 150, 150)
+        
+        display_text = self.text if self.text else self.placeholder
+        display_color = text_color if self.text else placeholder_color
+        
+        text_surface = font.render(display_text, True, display_color)
+        text_x = x + 10
+        text_y = y + (h - text_surface.get_height()) // 2
+        surface.blit(text_surface, (text_x, text_y))
+
+
 class UIDiv(UIBase):
     def __init__(self, styles="", parent=None, children=None, on_click=None):
         super().__init__(styles, parent)
@@ -507,70 +566,6 @@ class UIDiv(UIBase):
                 child.render(surface)
 
 
-#chatgpt har kodet UIInput med følgende prompt: "make a UIInput class based on UIDiv. it should on_click set focus: to true and take on_input where it changes a string according to what user types and the text is in UIInput.input"
-class UIInput(UIDiv):
-    def __init__(
-        self,
-        styles="",
-        parent=None,
-        placeholder="",
-        initial="",
-        on_input=None
-    ):
-        self.focused = False
-        self.input = initial
-        self.placeholder = placeholder
-        self.on_input = on_input
-
-        # text node used for rendering input contents
-        self.text_node = UIText(
-            initial or placeholder,
-            styles="text-neutral-500",
-            parent=None
-        )
-
-        super().__init__(
-            styles=styles,
-            parent=parent,
-            children=[self.text_node],
-            on_click=self._focus
-        )
-
-    def _focus(self):
-        self.focused = True
-
-    def blur(self):
-        self.focused = False
-
-    def handle_event(self, event):
-        # mouse click outside → blur
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            mx, my = pygame.mouse.get_pos()
-            x, y, w, h = self.box
-            if not (x <= mx <= x + w and y <= my <= y + h):
-                self.blur()
-
-        # keyboard input only when focused
-        if self.focused and event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_BACKSPACE:
-                self.input = self.input[:-1]
-            elif event.key == pygame.K_RETURN:
-                self.blur()
-            elif event.unicode and event.unicode.isprintable():
-                self.input += event.unicode
-
-            if self.on_input:
-                self.on_input(self.input)
-
-        # update rendered text
-        if self.input:
-            self.text_node.text = self.input
-            self.text_node.computed["color"] = (0, 0, 0)
-        else:
-            self.text_node.text = self.placeholder
-            self.text_node.computed["color"] = (150, 150, 150)
-
-        super().handle_event(event)
 
 class Screen:
     def __init__(self,width,height):
