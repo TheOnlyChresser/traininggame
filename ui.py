@@ -621,7 +621,7 @@ class UIDropdownTrigger(UIDiv):
 
 class UIDropdownMenu(UIDiv):
     pass
-½
+
 class UIDropdownOption(UIDiv):
     pass
 
