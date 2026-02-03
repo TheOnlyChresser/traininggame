@@ -20,12 +20,14 @@ TorcHdata = {
         "ConstantPad1d":nn.ConstantPad1d,
         "ZeroPad1d":nn.ZeroPad1d,
         "MaxPool1d":nn.MaxPool1d,
+        "MaxPool2d":nn.MaxPool2d,
         "AvgPool1d":nn.AvgPool1d,
         "FractionalMaxPool2d":nn.FractionalMaxPool2d,
         "AdaptiveMaxPool1d":nn.AdaptiveMaxPool1d,
         "LazyConv2d":nn.LazyConv2d,
         "ConvTranspose2d":nn.ConvTranspose2d,
-        "LazyConvTranspose2d":nn.LazyConvTranspose2d
+        "LazyConvTranspose2d":nn.LazyConvTranspose2d,
+        "Flatten":nn.Flatten
     },
     "lossFunktioner":{
         "L1Loss":nn.L1Loss,
