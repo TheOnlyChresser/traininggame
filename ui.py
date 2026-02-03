@@ -1,4 +1,5 @@
 import pygame
+from pygame.locals import GL_MULTISAMPLESAMPLES, GL_MULTISAMPLEBUFFERS
 
 # Font cache to avoid recreating fonts every frame
 _font_cache = {}
@@ -628,6 +629,8 @@ class UIDropdownOption(UIDiv):
 class Screen:
     def __init__(self,width,height):
         pygame.init()
-        self.surface=pygame.display.set_mode((width,height))
+        pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS, 1)
+        pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLESAMPLES, 3)
+        self.surface=pygame.display.set_mode((width,height), pygame.OPENGL)
         self.width,self.height=width,height
 
