@@ -629,8 +629,6 @@ class UIDropdownOption(UIDiv):
 class Screen:
     def __init__(self,width,height):
         pygame.init()
-        pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS, 1)
-        pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLESAMPLES, 3)
-        self.surface=pygame.display.set_mode((width,height), pygame.OPENGL)
+        self.surface = pygame.display.set_mode((width, height))
         self.width,self.height=width,height
 
