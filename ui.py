@@ -1,4 +1,5 @@
 import pygame
+from pygame.locals import GL_MULTISAMPLESAMPLES, GL_MULTISAMPLEBUFFERS
 
 colors = {
     "red": {
@@ -508,6 +509,8 @@ class UIDiv(UIBase):
 class Screen:
     def __init__(self,width,height):
         pygame.init()
-        self.surface=pygame.display.set_mode((width,height))
+        pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLEBUFFERS, 1)
+        pygame.display.gl_set_attribute(pygame.GL_MULTISAMPLESAMPLES, 3)
+        self.surface=pygame.display.set_mode((width,height), pygame.OPENGL)
         self.width,self.height=width,height
 
