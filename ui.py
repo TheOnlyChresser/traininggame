@@ -1,6 +1,15 @@
 import pygame
 from pygame.locals import GL_MULTISAMPLESAMPLES, GL_MULTISAMPLEBUFFERS
 
+# Font cache to avoid recreating fonts every frame
+_font_cache = {}
+
+def get_cached_font(font_name, font_size):
+    key = (font_name, font_size)
+    if key not in _font_cache:
+        _font_cache[key] = pygame.font.SysFont(font_name, font_size)
+    return _font_cache[key]
+
 colors = {
     "red": {
         "50": "#fef2f2",
@@ -377,8 +386,9 @@ class UIBase:
         if self.is_hovered: self.computed.update(self.hover_styles)
         else: self.computed=parse_classes(self.styles_str)[0]
 
-    def get_style(self,key,default=None):
-        return self.computed.get(key,default)
+    def get_style(self, key, default=None):
+        value = self.computed.get(key)
+        return default if value is None else value
 
     def compute_box(self):
         parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
@@ -401,7 +411,7 @@ class UIText(UIBase):
 
     def compute_box(self):
         font_size = self.get_style("font_size", 16)
-        font = pygame.font.SysFont(self.font_name, font_size)
+        font = get_cached_font(self.font_name, font_size)
         text_width, text_height = font.size(self.text)
         width = self.get_style("width") or text_width
         height = self.get_style("height") or text_height
@@ -414,9 +424,12 @@ class UIText(UIBase):
     def render(self, surface):
         font_size = self.get_style("font_size", 16)
         color = self.get_style("color") or (0, 0, 0)
-        font = pygame.font.SysFont(self.font_name, font_size)
+        font = get_cached_font(self.font_name, font_size)
         text_surface = font.render(self.text, True, color)
         surface.blit(text_surface, (self.box[0], self.box[1]))
+
+
+
 
 class UIDiv(UIBase):
     def __init__(self, styles="", parent=None, children=None, on_click=None):
@@ -498,13 +511,120 @@ class UIDiv(UIBase):
                 y = self.box[1] + (child.box[1] or 0)
                 font_size = child.get_style("font_size", 16)
                 color = child.get_style("color") or (0, 0, 0)
-                font = pygame.font.SysFont(child.font_name, font_size)
+                font = get_cached_font(child.font_name, font_size)
                 text_surface = font.render(child.text, True, color)
                 tx = x + (child.box[2] - text_surface.get_width()) // 2
                 ty = y + (child.box[3] - text_surface.get_height()) // 2
                 surface.blit(text_surface, (tx, ty))
             else:
                 child.render(surface)
+
+
+
+class UIInput(UIBase):
+    def __init__(self, placeholder="", styles="", parent=None, on_change=None):
+        super().__init__(styles, parent)
+        self.placeholder = placeholder
+        self.text = ""
+        self.focused = False
+        self.on_change = on_change
+        self.cursor_visible = True
+        self.cursor_timer = 0
+        self.font_name = self.get_style("font_family", "Arial")
+        self.radius = self.get_style("radius") or 0
+
+    def compute_box(self):
+        parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
+        width = int(self.get_style("width") or 200)
+        height = int(self.get_style("height") or 40)
+        x = int(self.get_style("left") or 0)
+        y = int(self.get_style("top") or 0)
+        self.box = (x, y, width, height)
+        return self.box
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            x, y, w, h = self.box
+            if x <= mx <= x + w and y <= my <= y + h:
+                self.focused = True
+            else:
+                self.focused = False
+
+        if self.focused and event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_BACKSPACE:
+                self.text = self.text[:-1]
+            elif event.key == pygame.K_RETURN:
+                self.focused = False
+            elif event.key == pygame.K_ESCAPE:
+                self.focused = False
+            else:
+                if event.unicode and event.unicode.isprintable():
+                    self.text += event.unicode
+            
+            if self.on_change:
+                self.on_change(self.text)
+
+    def update(self, dt):
+        self.cursor_timer += dt
+        if self.cursor_timer >= 500:
+            self.cursor_visible = not self.cursor_visible
+            self.cursor_timer = 0
+
+    def render(self, surface):
+        if not self.box:
+            self.compute_box()
+
+        x, y, w, h = self.box
+
+        # Draw background
+        bg = self.get_style("background") or (255, 255, 255)
+        pygame.draw.rect(surface, bg, self.box, border_radius=self.radius)
+
+        # Draw border (highlighted if focused)
+        border_color = (0, 120, 215) if self.focused else (200, 200, 200)
+        pygame.draw.rect(surface, border_color, self.box, width=2, border_radius=self.radius)
+
+        # Draw text or placeholder
+        font_size = self.get_style("font_size", 16)
+        font = get_cached_font(self.font_name, font_size)
+        
+        padding = 10
+        if self.text:
+            color = self.get_style("color") or (0, 0, 0)
+            text_surface = font.render(self.text, True, color)
+        else:
+            placeholder_color = (150, 150, 150)
+            text_surface = font.render(self.placeholder, True, placeholder_color)
+
+        # Center text vertically, align left with padding
+        tx = x + padding
+        ty = y + (h - text_surface.get_height()) // 2
+        
+        # Clip text to input bounds
+        clip_rect = pygame.Rect(x + padding, y, w - padding * 2, h)
+        surface.set_clip(clip_rect)
+        surface.blit(text_surface, (tx, ty))
+        surface.set_clip(None)
+
+        # Draw cursor if focused
+        if self.focused and self.cursor_visible:
+            cursor_x = tx + font.size(self.text)[0]
+            cursor_y1 = y + 8
+            cursor_y2 = y + h - 8
+            pygame.draw.line(surface, (0, 0, 0), (cursor_x, cursor_y1), (cursor_x, cursor_y2), 2)
+
+class UIDropdown(UIDiv):
+    pass
+
+class UIDropdownTrigger(UIDiv):
+    pass
+
+class UIDropdownMenu(UIDiv):
+    pass
+
+class UIDropdownOption(UIDiv):
+    pass
 
 class Screen:
     def __init__(self,width,height):
