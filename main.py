@@ -22,8 +22,6 @@ loss_function = ""
 def game_input(placeholder, initial_text):
     return UIInput(
         placeholder=placeholder,
-        initial=initial_text,
-        on_input=input_function,
         styles="w-300 h-60 bg-neutral-100 rounded-sm top-12 items-center flex flex-col justify-center font-arial"
     )
 
@@ -56,6 +54,8 @@ while running:
             running = False
         if menu:
             menu.handle_event(event)
+        else:
+            game.handle_event(event)
     if menu:
         menu.update_hover(mouse_position)
         menu.render(surface)
