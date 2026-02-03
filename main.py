@@ -4,7 +4,7 @@ from ui import UIDiv, UIText, Screen, UIInput
 def game_input(placeholder):
     return UIInput(
         placeholder=placeholder,
-        styles="w-300 h-60 bg-neutral-100 rounded-sm top-12 items-center flex flex-col justify-center font-arial"
+        styles="w-300 h-60 bg-neutral-100 rounded-sm items-center flex flex-col justify-center font-arial"
     )
 
 def game_button(text, on_click):
@@ -41,7 +41,7 @@ def start_training(node_count, layer_count, learning_rate, epochs, loss_function
 
 menu = UIDiv(styles="flex flex-col justify-center top-180 items-center w-800 h-600 bg-neutral-50")
 
-game = UIDiv(styles="w-800 h-600 bg-neutral-50 flex flex-col top-100")
+game = UIDiv(styles="w-800 h-1200 bg-neutral-50 flex flex-col top-0")
 
 menu.children.extend([
     UIDiv(styles="h-100 w-400 text-3xl font-arial top-0", children=[UIText("Velkommen til demoen", styles="text-center font-arial text-5xl")]),
@@ -86,6 +86,7 @@ drop = dropdown_menu([], placeholder="Vælg tabelfunktion")
 
 game.children.extend(
     [
+        UIText("Byg din egen AI", styles="text-center font-arial text-5xl"),
         node_input, 
         lag_input,
         learning_rate_input,
