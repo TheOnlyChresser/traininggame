@@ -615,16 +615,125 @@ class UIInput(UIBase):
             pygame.draw.line(surface, (0, 0, 0), (cursor_x, cursor_y1), (cursor_x, cursor_y2), 2)
 
 class UIDropdown(UIDiv):
-    pass
+    """Dropdown container. Children: UIDropdownTrigger, UIDropdownMenu"""
+    def __init__(self, styles="", parent=None, children=None, on_click=None):
+        super().__init__(styles, parent, children, on_click)
+        self.is_open = False
+        self.trigger = None
+        self.menu = None
+        # Find trigger and menu from children
+        for child in self.children:
+            if isinstance(child, UIDropdownTrigger):
+                self.trigger = child
+                child.dropdown = self
+            elif isinstance(child, UIDropdownMenu):
+                self.menu = child
+                child.dropdown = self
+
+    def toggle(self):
+        self.is_open = not self.is_open
+
+    def close(self):
+        self.is_open = False
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            # Check if clicked on trigger
+            if self.trigger and self.trigger.box:
+                tx, ty, tw, th = self.trigger.box
+                if tx <= mx <= tx + tw and ty <= my <= ty + th:
+                    self.toggle()
+                    return
+            # Check if clicked outside dropdown when open
+            if self.is_open:
+                if self.menu and self.menu.box:
+                    mx2, my2, mw, mh = self.menu.box
+                    if not (mx2 <= mx <= mx2 + mw and my2 <= my <= my2 + mh):
+                        self.close()
+        # Pass events to children
+        for child in self.children:
+            if hasattr(child, "handle_event"):
+                child.handle_event(event)
+
+    def render(self, surface):
+        if not self.box:
+            self.compute_box()
+        # Render trigger
+        if self.trigger:
+            self.trigger.render(surface)
+        # Render white overlay and menu when open
+        if self.is_open:
+            # Draw white overlay over entire screen
+            overlay = pygame.Surface(surface.get_size())
+            overlay.fill((255, 255, 255))
+            surface.blit(overlay, (0, 0))
+            # Re-render trigger on top of overlay
+            if self.trigger:
+                self.trigger.render(surface)
+            # Render menu
+            if self.menu:
+                self.menu.render(surface)
+
 
 class UIDropdownTrigger(UIDiv):
-    pass
+    """Dropdown trigger button. Parent: UIDropdown"""
+    def __init__(self, styles="", parent=None, children=None, on_click=None):
+        super().__init__(styles, parent, children, on_click)
+        self.dropdown = None  # Set by parent UIDropdown
+
+    def handle_event(self, event):
+        # Trigger events are handled by parent UIDropdown
+        for child in self.children:
+            if hasattr(child, "handle_event"):
+                child.handle_event(event)
+
 
 class UIDropdownMenu(UIDiv):
-    pass
+    """Dropdown menu container. Parent: UIDropdown, Children: UIDropdownOption"""
+    def __init__(self, styles="", parent=None, children=None, on_click=None):
+        super().__init__(styles, parent, children, on_click)
+        self.dropdown = None  # Set by parent UIDropdown
+        self.options = []
+        # Find options from children
+        for child in self.children:
+            if isinstance(child, UIDropdownOption):
+                self.options.append(child)
+                child.menu = self
+
+    def compute_box(self):
+        super().compute_box()
+        # Position menu below trigger if dropdown exists
+        if self.dropdown and self.dropdown.trigger and self.dropdown.trigger.box:
+            tx, ty, tw, th = self.dropdown.trigger.box
+            x, y, w, h = self.box
+            self.box = (tx, ty + th, w, h)
+        return self.box
+
 
 class UIDropdownOption(UIDiv):
-    pass
+    """Dropdown menu option. Parent: UIDropdownMenu"""
+    def __init__(self, value="", styles="", parent=None, children=None, on_click=None, on_select=None):
+        super().__init__(styles, parent, children, on_click)
+        self.value = value
+        self.menu = None  # Set by parent UIDropdownMenu
+        self.on_select = on_select
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+            if self.box:
+                x, y, w, h = self.box
+                if x <= mx <= x + w and y <= my <= y + h:
+                    if self.on_select:
+                        self.on_select(self.value)
+                    if self.menu and self.menu.dropdown:
+                        self.menu.dropdown.close()
+                    if self.on_click:
+                        self.on_click()
+        for child in self.children:
+            if hasattr(child, "handle_event"):
+                child.handle_event(event)
 
 class Screen:
     def __init__(self,width,height):
