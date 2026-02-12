@@ -355,13 +355,7 @@ def parse_classes(class_string):
         elif cls_name in ("relative","absolute","fixed"): set_style("position",cls_name)
         elif parts[0] in ("justify","items"): set_style(parts[0],parts[1])
         elif parts[0] in ("w","h","top","left"):
-            if parts[0] == "w":
-                key = "width"
-            elif parts[0] == "h":
-                key = "height"
-            else:
-                key = parts[0]
-            set_style(key, int(parts[1]) if parts[1].isdigit() else None)
+            set_style("width" if parts[0]=="w" else parts[0], int(parts[1]) if parts[1].isdigit() else None)
         elif parts[0]=="bg" and parts[1] in colors and parts[2] in colors[parts[1]]:
             set_style("background",hex_to_rgb(colors[parts[1]][parts[2]]))
         elif parts[0]=="text":
@@ -394,13 +388,10 @@ class UIBase:
         return False
 
     def is_render_allowed(self):
-        return True
-
-    def is_event_allowed(self):
         active = UIDropdown.active_dropdown if "UIDropdown" in globals() else None
         if not active:
             return True
-        return self.is_descendant_of(active) or active.is_descendant_of(self)
+        return self.is_descendant_of(active)
 
     def update_hover(self,mouse_pos):
         if not self.box: return
@@ -469,25 +460,6 @@ class UIDiv(UIBase):
         if "flex-col" in styles:
             self.flex_direction = "column"
 
-    def _layout_children_in_current_box(self):
-        if not self.box:
-            return
-        x, y, width, height = self.box
-        offset_x = 0
-        offset_y = 0
-        for child in self.children:
-            child.compute_box()
-            cw = child.box[2] if child.box else 0
-            ch = child.box[3] if child.box else 0
-            if self.flex_direction == "row":
-                child.box = (x + offset_x, y + (height - ch) // 2, cw, ch)
-                offset_x += cw + 10
-            else:
-                child.box = (x + (width - cw) // 2, y + offset_y, cw, ch)
-                offset_y += ch + 10
-            if isinstance(child, UIDiv):
-                child._layout_children_in_current_box()
-
     def compute_box(self):
         parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
         parent_h = self.parent.box[3] if self.parent and self.parent.box else 600
@@ -499,7 +471,19 @@ class UIDiv(UIBase):
 
         self.box = (x, y, width, height)
 
-        self._layout_children_in_current_box()
+        offset_x = 0
+        offset_y = 0
+        for child in self.children:
+            child.compute_box()
+            cw = child.box[2] if child.box else 0
+            ch = child.box[3] if child.box else 0
+
+            if self.flex_direction == "row":
+                child.box = (x + offset_x, y + (height - ch)//2, cw, ch)
+                offset_x += cw + 10
+            else:
+                child.box = (x + (width - cw)//2, y + offset_y, cw, ch)
+                offset_y += ch + 10
 
         if self.flex_direction == "row" and self.get_style("height") is None:
             self.box = (x, y, width, max(height, max((child.box[3] for child in self.children), default=height)))
@@ -509,8 +493,6 @@ class UIDiv(UIBase):
         return self.box
 
     def handle_event(self, event):
-        if not self.is_event_allowed():
-            return
         if self.on_click and event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = pygame.mouse.get_pos()
             x, y, w, h = self.box
@@ -537,44 +519,25 @@ class UIDiv(UIBase):
         if not self.box:
             self.compute_box()
 
+        if not self.is_render_allowed():
+            for child in self.children:
+                child.render(surface)
+            return
+
         bg = self.get_style("background")
         if bg:
             pygame.draw.rect(surface, bg, self.box, border_radius=self.radius or 0)
 
-        active_dropdown = UIDropdown.active_dropdown if "UIDropdown" in globals() else None
-        deferred_children = []
-
         for child in self.children:
-            if active_dropdown and active_dropdown.is_descendant_of(child):
-                deferred_children.append(child)
-                continue
             if isinstance(child, UIText):
-                x = child.box[0] if child.box else self.box[0]
-                y = child.box[1] if child.box else self.box[1]
+                x = self.box[0] + (child.box[0] or 0)
+                y = self.box[1] + (child.box[1] or 0)
                 font_size = child.get_style("font_size", 16)
                 color = child.get_style("color") or (0, 0, 0)
                 font = get_cached_font(child.font_name, font_size)
                 text_surface = font.render(child.text, True, color)
-                cw = child.box[2] if child.box else self.box[2]
-                ch = child.box[3] if child.box else self.box[3]
-                tx = x + (cw - text_surface.get_width()) // 2
-                ty = y + (ch - text_surface.get_height()) // 2
-                surface.blit(text_surface, (tx, ty))
-            else:
-                child.render(surface)
-
-        for child in deferred_children:
-            if isinstance(child, UIText):
-                x = child.box[0] if child.box else self.box[0]
-                y = child.box[1] if child.box else self.box[1]
-                font_size = child.get_style("font_size", 16)
-                color = child.get_style("color") or (0, 0, 0)
-                font = get_cached_font(child.font_name, font_size)
-                text_surface = font.render(child.text, True, color)
-                cw = child.box[2] if child.box else self.box[2]
-                ch = child.box[3] if child.box else self.box[3]
-                tx = x + (cw - text_surface.get_width()) // 2
-                ty = y + (ch - text_surface.get_height()) // 2
+                tx = x + (child.box[2] - text_surface.get_width()) // 2
+                ty = y + (child.box[3] - text_surface.get_height()) // 2
                 surface.blit(text_surface, (tx, ty))
             else:
                 child.render(surface)
@@ -603,9 +566,6 @@ class UIInput(UIBase):
         return self.box
 
     def handle_event(self, event):
-        if not self.is_event_allowed():
-            self.focused = False
-            return
         if event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = pygame.mouse.get_pos()
             x, y, w, h = self.box
@@ -708,25 +668,12 @@ class UIDropdown(UIDiv):
             tw = self.trigger.box[2] if self.trigger.box else w
             th = self.trigger.box[3] if self.trigger.box else 50
             self.trigger.box = (x, y, tw, th)
-            if isinstance(self.trigger, UIDiv):
-                self.trigger._layout_children_in_current_box()
         if self.menu:
             self.menu.compute_box()
-            mw = w
+            mw = self.menu.box[2] if self.menu.box else w
             mh = self.menu.box[3] if self.menu.box else 50
             trigger_h = self.trigger.box[3] if self.trigger and self.trigger.box else 0
             self.menu.box = (x, y + trigger_h, mw, mh)
-            if isinstance(self.menu, UIDiv):
-                self.menu._layout_children_in_current_box()
-            option_y = self.menu.box[1]
-            for option in self.menu.options:
-                option.compute_box()
-                ow = mw
-                oh = option.box[3] if option.box else 40
-                option.box = (x, option_y, ow, oh)
-                if isinstance(option, UIDiv):
-                    option._layout_children_in_current_box()
-                option_y += oh + 6
 
     def compute_box(self):
         parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
@@ -742,16 +689,11 @@ class UIDropdown(UIDiv):
         return self.box
 
     def toggle(self):
-        if not self.is_open:
-            if UIDropdown.active_dropdown and UIDropdown.active_dropdown is not self:
-                UIDropdown.active_dropdown.close()
-            self.is_open = True
+        self.is_open = not self.is_open
+        if self.is_open:
             UIDropdown.active_dropdown = self
         elif UIDropdown.active_dropdown is self:
-            self.is_open = False
             UIDropdown.active_dropdown = None
-        else:
-            self.is_open = False
 
     def close(self):
         self.is_open = False
@@ -760,9 +702,6 @@ class UIDropdown(UIDiv):
 
     def handle_event(self, event):
         self._layout_children()
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE and self.is_open:
-            self.close()
-            return
         if event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = pygame.mouse.get_pos()
             # Check if clicked on trigger
@@ -777,25 +716,20 @@ class UIDropdown(UIDiv):
                     mx2, my2, mw, mh = self.menu.box
                     if not (mx2 <= mx <= mx2 + mw and my2 <= my <= my2 + mh):
                         self.close()
-        if self.trigger and hasattr(self.trigger, "handle_event"):
-            self.trigger.handle_event(event)
-        if self.is_open and self.menu and hasattr(self.menu, "handle_event"):
-            self.menu.handle_event(event)
+        # Pass events to children
+        for child in self.children:
+            if hasattr(child, "handle_event"):
+                child.handle_event(event)
 
     def render(self, surface):
         if not self.box:
             self.compute_box()
         else:
             self._layout_children()
-        if self.trigger:
+        if self.trigger and not self.is_open:
             self.trigger.render(surface)
         if self.is_open:
             if self.menu:
-                if self.menu.box:
-                    mx, my, mw, mh = self.menu.box
-                    panel_rect = pygame.Rect(mx - 6, my - 6, mw + 12, mh + 12)
-                    pygame.draw.rect(surface, (245, 245, 245), panel_rect, border_radius=10)
-                    pygame.draw.rect(surface, (205, 205, 205), panel_rect, width=1, border_radius=10)
                 self.menu.render(surface)
 
 
@@ -844,10 +778,6 @@ class UIDropdownOption(UIDiv):
         self.on_select = on_select
 
     def handle_event(self, event):
-        if self.menu and self.menu.dropdown and not self.menu.dropdown.is_open:
-            return
-        if not self.is_event_allowed():
-            return
         if event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = pygame.mouse.get_pos()
             if self.box:
