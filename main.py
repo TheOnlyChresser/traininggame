@@ -16,44 +16,28 @@ from data.torchDATA import TorcHdata
 SUPPORTED_LAYER_TYPES = {"Linear", "Flatten", "Dropout"}
 SUPPORTED_LOSSES = {"L1Loss", "MSELoss", "HuberLoss", "BCEWithLogitsLoss", "KLDivLoss"}
 
-LOSS_CHOICES = [
-    ("Sammenlign med facit (anbefalet)", "MSELoss"),
-    ("Blid fejlmåling", "HuberLoss"),
-    ("Direkte forskel", "L1Loss"),
-]
-ACTIVATION_CHOICES = [
-    ("Hurtig læring (anbefalet)", "ReLU"),
-    ("Blød læring", "Tanh"),
-    ("Forsigtig læring", "ELU"),
-]
-LAYER_CHOICES = [
-    ("Tænk-lag (anbefalet)", "Linear"),
-    ("Ryd op i input", "Flatten"),
-    ("Gør modellen robust", "Dropout"),
-]
-
-LAYER_LABEL_BY_TYPE = {value: label for label, value in LAYER_CHOICES}
-
 
 def game_input(placeholder):
     return UIInput(
         placeholder=placeholder,
-        styles="w-360 h-56 bg-neutral-100 rounded-md items-center flex flex-col justify-center font-arial",
+        styles="w-300 h-60 bg-neutral-100 rounded-sm items-center flex flex-col justify-center font-arial",
     )
 
 
 def game_button(text, on_click):
     return UIDiv(
-        styles="w-360 h-56 bg-sky-500 rounded-md hover:bg-sky-400 items-center flex flex-col justify-center",
+        styles="w-300 h-60 bg-sky-500 rounded-sm hover:bg-sky-400 top-12 items-center flex flex-col justify-center",
         on_click=on_click,
-        children=[UIText(text, styles="text-neutral-50 text-lg font-arial text-center")],
+        children=[UIText(text, styles="text-neutral-50 text-xl font-arial text-center")],
     )
 
 
-def progress_bar(surface, value, x=170, y=470, bar_width=460, bar_height=28):
+def progress_bar(surface, value):
+    bar_width = 400
+    bar_height = 30
     filled_width = int(bar_width * max(0.0, min(1.0, value)))
-    pygame.draw.rect(surface, (220, 230, 245), (x, y, bar_width, bar_height), border_radius=8)
-    pygame.draw.rect(surface, (60, 170, 95), (x, y, filled_width, bar_height), border_radius=8)
+    pygame.draw.rect(surface, (200, 200, 200), (200, 300, bar_width, bar_height))
+    pygame.draw.rect(surface, (100, 200, 100), (200, 300, filled_width, bar_height))
 
 
 def make_dropdown(options, placeholder, on_select):
@@ -81,30 +65,6 @@ def make_dropdown(options, placeholder, on_select):
     )
 
     dropdown = UIDropdown(styles="flex flex-col w-300 top-12", children=[trigger, menu])
-    return dropdown, label
-
-
-def make_choice_dropdown(choices, placeholder, on_select):
-    label = UIText(placeholder, styles="text-neutral-700 text-center")
-    trigger = UIDropdownTrigger(
-        styles="w-360 h-56 bg-neutral-100 rounded-md items-center flex flex-col justify-center font-arial",
-        children=[label],
-    )
-
-    option_items = []
-    for option_label, option_value in choices:
-        option_items.append(
-            UIDropdownOption(
-                value=option_value,
-                styles="w-360 h-38 bg-neutral-200 rounded-sm hover:bg-neutral-300 items-center flex flex-col justify-center font-arial",
-                children=[UIText(option_label, styles="text-neutral-700 text-center")],
-                on_select=lambda value, shown=option_label, cb=on_select, lbl=label: (cb(value), setattr(lbl, "text", shown)),
-            )
-        )
-
-    menu_height = max(48, 8 + (len(choices) * 44))
-    menu = UIDropdownMenu(styles=f"flex flex-col w-360 h-{menu_height}", children=option_items)
-    dropdown = UIDropdown(styles="flex flex-col w-360", children=[trigger, menu])
     return dropdown, label
 
 
@@ -177,7 +137,7 @@ def parse_learning_rate(raw):
 
 screen = Screen(800, 600)
 surface = screen.surface
-pygame.display.set_caption("AI-spil")
+pygame.display.set_caption("AI spil")
 
 STATE_MENU = "menu"
 STATE_SETUP = "setup"
@@ -211,15 +171,14 @@ training_state = {
 
 
 def build_menu():
-    root = UIDiv(styles="flex flex-col items-center w-800 h-600 bg-neutral-50 top-0")
+    root = UIDiv(styles="flex flex-col justify-center top-180 items-center w-800 h-600 bg-neutral-50")
     root.children.extend(
         [
-            UIDiv(styles="w-10 h-30"),
-            UIText("AI Adventure", styles="text-center font-arial text-5xl"),
-            UIText("Et læringsspil for begyndere", styles="text-center font-arial text-lg text-neutral-700"),
-            UIText("Du vælger enkle byggeklodser, og spillet forklarer resultatet.", styles="text-center font-arial text-sm text-neutral-500"),
-            UIDiv(styles="w-10 h-20"),
-            game_button("Start demo", lambda: switch_state(STATE_SETUP)),
+            UIDiv(
+                styles="h-100 w-400 text-3xl font-arial top-0",
+                children=[UIText("Velkommen til demoen", styles="text-center font-arial text-5xl")],
+            ),
+            game_button("Prov demo", lambda: switch_state(STATE_SETUP)),
             game_button("Afslut demo", lambda: exit()),
         ]
     )
@@ -227,13 +186,15 @@ def build_menu():
 
 
 def build_setup():
-    root = UIDiv(styles="w-800 h-600 bg-neutral-50 flex flex-col top-0")
+    root = UIDiv(styles="w-800 h-1200 bg-neutral-50 flex flex-col top-0")
     error_text = UIText("", styles="text-center font-arial text-base text-rose-500")
-    step_text = UIText("Trin 1 af 3: Vælg grundindstillinger (tip: brug 'Begynder setup')", styles="text-center font-arial text-sm text-sky-600")
 
     layers_input = game_input("Antal lag (f.eks. 3)")
     epochs_input = game_input("Epoker (tom = 3)")
-    lr_input = game_input("Læringsrate (tom = 0.001)")
+    lr_input = game_input("Laeringsrate (tom = 0.001)")
+
+    loss_options = [name for name in TorcHdata["lossFunktioner"].keys() if name in SUPPORTED_LOSSES]
+    act_options = list(TorcHdata["aktFunktioner"].keys())
 
     def set_loss(value):
         config["loss"] = value
@@ -241,26 +202,16 @@ def build_setup():
     def set_activation(value):
         config["activation"] = value
 
-    loss_dropdown, loss_label = make_choice_dropdown(LOSS_CHOICES, "Hvordan skal vi måle fejl?", set_loss)
-    act_dropdown, act_label = make_choice_dropdown(ACTIVATION_CHOICES, "Hvordan skal modellen lære?", set_activation)
-
-    def set_beginner_setup():
-        layers_input.text = "3"
-        epochs_input.text = "3"
-        lr_input.text = "0.001"
-        config["loss"] = "MSELoss"
-        config["activation"] = "ReLU"
-        loss_label.text = "Sammenlign med facit (anbefalet)"
-        act_label.text = "Hurtig læring (anbefalet)"
-        error_text.text = ""
+    loss_dropdown, _ = make_dropdown(loss_options, "Vaelg lossfunktion", set_loss)
+    act_dropdown, _ = make_dropdown(act_options, "Vaelg aktiveringsfunktion", set_activation)
 
     def go_next():
         try:
             layers_text = layers_input.text.strip()
             if not layers_text.isdigit() or int(layers_text) <= 0:
-                raise ValueError("Skriv et positivt heltal i 'Antal lag'.")
+                raise ValueError("Antal lag skal vaere et heltal over 0.")
             if config["loss"] is None or config["activation"] is None:
-                raise ValueError("Vælg både fejlmåling og læringsstil.")
+                raise ValueError("Vaelg baade loss- og aktiveringsfunktion.")
 
             parse_epochs(epochs_input.text)
             parse_learning_rate(lr_input.text)
@@ -278,15 +229,13 @@ def build_setup():
 
     root.children.extend(
         [
-            UIText("Byg din egen AI-model", styles="text-center font-arial text-4xl"),
-            step_text,
-            game_button("Begynder setup", set_beginner_setup),
+            UIText("Byg din egen AI", styles="text-center font-arial text-5xl"),
             layers_input,
             epochs_input,
             lr_input,
             loss_dropdown,
             act_dropdown,
-            game_button("Næste trin", go_next),
+            game_button("Naeste", go_next),
             error_text,
         ]
     )
@@ -303,43 +252,34 @@ def init_layers(count):
 
 
 def build_layers():
-    root = UIDiv(styles="w-800 h-600 bg-neutral-50 flex flex-col top-0")
+    root = UIDiv(styles="w-800 h-1200 bg-neutral-50 flex flex-col top-0")
     title = UIText("", styles="text-center font-arial text-4xl")
-    step_text = UIText("Trin 2 af 3: Byg lagene", styles="text-center font-arial text-base text-sky-600")
-    helper = UIText("", styles="text-center font-arial text-sm text-neutral-500")
+    helper = UIText("Linear: in=784,out=128 | Flatten: start=1,end=-1 | Dropout: p=0.5", styles="text-center font-arial text-sm text-neutral-500")
     error_text = UIText("", styles="text-center font-arial text-base text-rose-500")
+
+    layer_type_options = [name for name in TorcHdata["lagTyper"].keys() if name in SUPPORTED_LAYER_TYPES]
 
     def set_layer_type(value):
         layer_configs[current_layer_index]["type"] = value
 
-    layer_dropdown, layer_label = make_choice_dropdown(
-        LAYER_CHOICES,
-        "Vælg en byggeklods",
+    layer_dropdown, layer_label = make_dropdown(
+        layer_type_options,
+        "Vaelg lagtype",
         set_layer_type,
     )
-    params_input = game_input("Valgfri detaljer (kan stå tom)")
+    params_input = game_input("Parametre")
 
     def sync_layer_fields():
         if not layer_configs:
             title.text = "Lag"
             params_input.text = ""
-            layer_label.text = "Vælg en byggeklods"
-            helper.text = "Vælg en byggeklods. Du kan lade feltet stå tomt."
+            layer_label.text = "Vaelg lagtype"
             error_text.text = ""
             return
         title.text = f"Lag {current_layer_index + 1} af {len(layer_configs)}"
         current = layer_configs[current_layer_index]
         params_input.text = current["params"]
-        layer_label.text = LAYER_LABEL_BY_TYPE.get(current["type"], "Vælg en byggeklods")
-        selected = current["type"]
-        if selected == "Linear":
-            helper.text = "Tænk-lag: øger modellens evne til at kende mønstre."
-        elif selected == "Flatten":
-            helper.text = "Ryd op i input: gør data klar til næste trin."
-        elif selected == "Dropout":
-            helper.text = "Robust-lag: hjælper modellen med ikke at huske for hårdt."
-        else:
-            helper.text = "Vælg en byggeklods. Du kan lade feltet stå tomt."
+        layer_label.text = current["type"] or "Vaelg lagtype"
         error_text.text = ""
 
     def go_back():
@@ -352,7 +292,7 @@ def build_layers():
     def go_next():
         layer_configs[current_layer_index]["params"] = params_input.text.strip()
         if layer_configs[current_layer_index]["type"] is None:
-            error_text.text = "Du mangler at vælge en byggeklods for dette lag."
+            error_text.text = "Vaelg en lagtype for dette lag."
             return
         if current_layer_index + 1 >= len(layer_configs):
             switch_state(STATE_RESULTS)
@@ -362,12 +302,11 @@ def build_layers():
     root.children.extend(
         [
             title,
-            step_text,
             helper,
             layer_dropdown,
             params_input,
             game_button("Tilbage", go_back),
-            game_button("Næste trin", go_next),
+            game_button("Naeste", go_next),
             error_text,
         ]
     )
@@ -377,12 +316,10 @@ def build_layers():
 
 
 def build_results():
-    root = UIDiv(styles="flex flex-col items-center w-800 h-600 bg-neutral-50 top-0")
-    step_text = UIText("Trin 3 af 3: Træn og se resultatet", styles="text-center font-arial text-base text-sky-600")
-    headline = UIText("Træning starter...", styles="text-center font-arial text-4xl")
+    root = UIDiv(styles="flex flex-col justify-center top-120 items-center w-800 h-600 bg-neutral-50")
+    headline = UIText("Traening starter...", styles="text-center font-arial text-4xl")
     status = UIText("", styles="text-center font-arial text-base text-neutral-600")
     metrics = UIText("", styles="text-center font-arial text-base text-neutral-700")
-    coaching = UIText("", styles="text-center font-arial text-sm text-neutral-500")
     error = UIText("", styles="text-center font-arial text-base text-rose-500")
 
     def back_to_layers():
@@ -393,19 +330,14 @@ def build_results():
 
     root.children.extend(
         [
-            step_text,
             headline,
             status,
             metrics,
-            coaching,
             error,
-            UIDiv(styles="w-10 h-20"),
-            game_button("Ret byggeklodser", back_to_layers),
-            game_button("Tilbage til menu", back_to_menu),
         ]
     )
 
-    return root, headline, status, metrics, coaching, error
+    return root, headline, status, metrics, error
 
 
 def change_layer(index):
@@ -429,7 +361,7 @@ def _update_training(payload):
             training_state["progress"] = 1.0
             training_state["loss"] = payload.get("loss")
             training_state["accuracy"] = payload.get("accuracy")
-            training_state["message"] = "Træning færdig."
+            training_state["message"] = "Traening faerdig."
 
 
 def _start_training():
@@ -440,7 +372,7 @@ def _start_training():
         for layer in layer_configs:
             layer_type = layer["type"]
             if layer_type is None:
-                raise ValueError("Alle trin skal have en valgt byggeklods.")
+                raise ValueError("Alle lag skal have en lagtype.")
             layers.append({"type": layer_type, "params": parse_layer_params(layer_type, layer["params"])})
 
         epochs = parse_epochs(config["epochs"])
@@ -461,7 +393,7 @@ def _start_training():
             training_state["epochs_total"] = epochs
             training_state["loss"] = None
             training_state["accuracy"] = None
-            training_state["message"] = "Starter træning..."
+            training_state["message"] = "Starter traening..."
             training_state["error"] = ""
 
         def worker():
@@ -471,7 +403,7 @@ def _start_training():
                 with training_lock:
                     training_state["status"] = "error"
                     training_state["error"] = str(exc)
-                    training_state["message"] = "Træning fejlede."
+                    training_state["message"] = "Traening fejlede."
 
         train_thread = threading.Thread(target=worker, daemon=True)
         with training_lock:
@@ -480,14 +412,14 @@ def _start_training():
     except ModuleNotFoundError as exc:
         missing = str(exc)
         if "torch" in missing:
-            message = "PyTorch mangler. Installer 'torch' og 'torchvision' i dit aktive miljø."
+            message = "PyTorch mangler. Installer 'torch' og 'torchvision' i dit aktive miljoe."
         else:
             message = missing
         with training_lock:
             training_state["status"] = "error"
             training_state["progress"] = 0.0
             training_state["error"] = message
-            training_state["message"] = "Træning kan ikke starte."
+            training_state["message"] = "Traening kan ikke starte."
     except Exception as exc:
         with training_lock:
             training_state["status"] = "error"
@@ -507,7 +439,7 @@ def switch_state(next_state):
 menu_root = build_menu()
 setup_root, setup_inputs = build_setup()
 layers_root, layers_params_input, layer_sync = build_layers()
-results_root, results_headline, results_status, results_metrics, results_coaching, results_error = build_results()
+results_root, results_headline, results_status, results_metrics, results_error = build_results()
 
 clock = pygame.time.Clock()
 running = True
@@ -551,44 +483,35 @@ while running:
             snapshot = dict(training_state)
 
         if snapshot["status"] == "running":
-            results_headline.text = f"Træning... {int(snapshot['progress'] * 100)}%"
-            results_status.text = f"Mission i gang: {snapshot['message']}"
+            results_headline.text = f"Traening... {int(snapshot['progress'] * 100)}%"
+            results_status.text = snapshot["message"]
             if snapshot["loss"] is not None:
-                results_metrics.text = f"Fejlscore: {snapshot['loss']:.6f}"
+                results_metrics.text = f"Seneste loss: {snapshot['loss']:.6f}"
             else:
                 results_metrics.text = ""
-            results_coaching.text = "Lavere fejlscore er godt. Målet er at blive mere præcis."
             results_error.text = ""
         elif snapshot["status"] == "success":
-            results_headline.text = "Mission gennemført"
+            results_headline.text = "Traening faerdig"
             results_status.text = snapshot["message"]
             loss = snapshot["loss"]
             accuracy = snapshot["accuracy"]
-            results_metrics.text = f"Fejlscore: {loss:.6f} | Præcision: {accuracy:.2f}%"
-            if accuracy >= 90:
-                results_coaching.text = "Super! Du har bygget en stærk model."
-            elif accuracy >= 75:
-                results_coaching.text = "Flot! Prøv evt. flere epoker eller en ekstra byggeklods."
-            else:
-                results_coaching.text = "God start. Prøv flere lag eller mindre dropout."
+            results_metrics.text = f"Loss: {loss:.6f} | Accuracy: {accuracy:.2f}%"
             results_error.text = ""
         elif snapshot["status"] == "error":
-            results_headline.text = "Træning fejlede"
-            results_status.text = f"Mission stoppet: {snapshot['message']}"
+            results_headline.text = "Traening fejlede"
+            results_status.text = snapshot["message"]
             results_metrics.text = ""
-            results_coaching.text = "Tip: Brug 'Begynder setup' og 3 lag som start."
             results_error.text = snapshot["error"]
         else:
             results_headline.text = "Klar"
             results_status.text = ""
             results_metrics.text = ""
-            results_coaching.text = ""
             results_error.text = ""
 
         results_root.compute_box()
         results_root.update_hover(mouse_position)
         results_root.render(surface)
-        progress_bar(surface, snapshot["progress"], y=500)
+        progress_bar(surface, snapshot["progress"])
 
     pygame.display.update()
 
