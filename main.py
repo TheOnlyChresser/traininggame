@@ -1,4 +1,4 @@
-import threading
+﻿import threading
 import pygame
 
 from ui import (
@@ -191,7 +191,7 @@ def build_setup():
 
     layers_input = game_input("Antal lag (f.eks. 3)")
     epochs_input = game_input("Epoker (tom = 3)")
-    lr_input = game_input("Laeringsrate (tom = 0.001)")
+    lr_input = game_input("Læringsrate (tom = 0.001)")
 
     loss_options = [name for name in TorcHdata["lossFunktioner"].keys() if name in SUPPORTED_LOSSES]
     act_options = list(TorcHdata["aktFunktioner"].keys())
@@ -202,16 +202,16 @@ def build_setup():
     def set_activation(value):
         config["activation"] = value
 
-    loss_dropdown, _ = make_dropdown(loss_options, "Vaelg lossfunktion", set_loss)
-    act_dropdown, _ = make_dropdown(act_options, "Vaelg aktiveringsfunktion", set_activation)
+    loss_dropdown, _ = make_dropdown(loss_options, "Vælg lossfunktion", set_loss)
+    act_dropdown, _ = make_dropdown(act_options, "Vælg aktiveringsfunktion", set_activation)
 
     def go_next():
         try:
             layers_text = layers_input.text.strip()
             if not layers_text.isdigit() or int(layers_text) <= 0:
-                raise ValueError("Antal lag skal vaere et heltal over 0.")
+                raise ValueError("Antal lag skal være et heltal over 0.")
             if config["loss"] is None or config["activation"] is None:
-                raise ValueError("Vaelg baade loss- og aktiveringsfunktion.")
+                raise ValueError("Vælg både loss- og aktiveringsfunktion.")
 
             parse_epochs(epochs_input.text)
             parse_learning_rate(lr_input.text)
@@ -235,7 +235,7 @@ def build_setup():
             lr_input,
             loss_dropdown,
             act_dropdown,
-            game_button("Naeste", go_next),
+            game_button("Næste", go_next),
             error_text,
         ]
     )
@@ -264,7 +264,7 @@ def build_layers():
 
     layer_dropdown, layer_label = make_dropdown(
         layer_type_options,
-        "Vaelg lagtype",
+        "Vælg lagtype",
         set_layer_type,
     )
     params_input = game_input("Parametre")
@@ -273,13 +273,13 @@ def build_layers():
         if not layer_configs:
             title.text = "Lag"
             params_input.text = ""
-            layer_label.text = "Vaelg lagtype"
+            layer_label.text = "Vælg lagtype"
             error_text.text = ""
             return
         title.text = f"Lag {current_layer_index + 1} af {len(layer_configs)}"
         current = layer_configs[current_layer_index]
         params_input.text = current["params"]
-        layer_label.text = current["type"] or "Vaelg lagtype"
+        layer_label.text = current["type"] or "Vælg lagtype"
         error_text.text = ""
 
     def go_back():
@@ -292,7 +292,7 @@ def build_layers():
     def go_next():
         layer_configs[current_layer_index]["params"] = params_input.text.strip()
         if layer_configs[current_layer_index]["type"] is None:
-            error_text.text = "Vaelg en lagtype for dette lag."
+            error_text.text = "Vælg en lagtype for dette lag."
             return
         if current_layer_index + 1 >= len(layer_configs):
             switch_state(STATE_RESULTS)
@@ -306,7 +306,7 @@ def build_layers():
             layer_dropdown,
             params_input,
             game_button("Tilbage", go_back),
-            game_button("Naeste", go_next),
+            game_button("Næste", go_next),
             error_text,
         ]
     )
@@ -317,7 +317,7 @@ def build_layers():
 
 def build_results():
     root = UIDiv(styles="flex flex-col justify-center top-120 items-center w-800 h-600 bg-neutral-50")
-    headline = UIText("Traening starter...", styles="text-center font-arial text-4xl")
+    headline = UIText("Træning starter...", styles="text-center font-arial text-4xl")
     status = UIText("", styles="text-center font-arial text-base text-neutral-600")
     metrics = UIText("", styles="text-center font-arial text-base text-neutral-700")
     error = UIText("", styles="text-center font-arial text-base text-rose-500")
@@ -361,7 +361,7 @@ def _update_training(payload):
             training_state["progress"] = 1.0
             training_state["loss"] = payload.get("loss")
             training_state["accuracy"] = payload.get("accuracy")
-            training_state["message"] = "Traening faerdig."
+            training_state["message"] = "Træning færdig."
 
 
 def _start_training():
@@ -403,7 +403,7 @@ def _start_training():
                 with training_lock:
                     training_state["status"] = "error"
                     training_state["error"] = str(exc)
-                    training_state["message"] = "Traening fejlede."
+                    training_state["message"] = "Træning fejlede."
 
         train_thread = threading.Thread(target=worker, daemon=True)
         with training_lock:
@@ -412,14 +412,14 @@ def _start_training():
     except ModuleNotFoundError as exc:
         missing = str(exc)
         if "torch" in missing:
-            message = "PyTorch mangler. Installer 'torch' og 'torchvision' i dit aktive miljoe."
+            message = "PyTorch mangler. Installer 'torch' og 'torchvision' i dit aktive miljø."
         else:
             message = missing
         with training_lock:
             training_state["status"] = "error"
             training_state["progress"] = 0.0
             training_state["error"] = message
-            training_state["message"] = "Traening kan ikke starte."
+            training_state["message"] = "Træning kan ikke starte."
     except Exception as exc:
         with training_lock:
             training_state["status"] = "error"
@@ -483,7 +483,7 @@ while running:
             snapshot = dict(training_state)
 
         if snapshot["status"] == "running":
-            results_headline.text = f"Traening... {int(snapshot['progress'] * 100)}%"
+            results_headline.text = f"Træning... {int(snapshot['progress'] * 100)}%"
             results_status.text = snapshot["message"]
             if snapshot["loss"] is not None:
                 results_metrics.text = f"Seneste loss: {snapshot['loss']:.6f}"
@@ -491,14 +491,14 @@ while running:
                 results_metrics.text = ""
             results_error.text = ""
         elif snapshot["status"] == "success":
-            results_headline.text = "Traening faerdig"
+            results_headline.text = "Træning færdig"
             results_status.text = snapshot["message"]
             loss = snapshot["loss"]
             accuracy = snapshot["accuracy"]
             results_metrics.text = f"Loss: {loss:.6f} | Accuracy: {accuracy:.2f}%"
             results_error.text = ""
         elif snapshot["status"] == "error":
-            results_headline.text = "Traening fejlede"
+            results_headline.text = "Træning fejlede"
             results_status.text = snapshot["message"]
             results_metrics.text = ""
             results_error.text = snapshot["error"]
@@ -517,3 +517,4 @@ while running:
 
 
 pygame.quit()
+
