@@ -354,8 +354,9 @@ def parse_classes(class_string):
         if cls_name in ("flex","block"): set_style("display",cls_name)
         elif cls_name in ("relative","absolute","fixed"): set_style("position",cls_name)
         elif parts[0] in ("justify","items"): set_style(parts[0],parts[1])
-        elif parts[0] in ("w","h","top","left"):
-            set_style("width" if parts[0]=="w" else parts[0], int(parts[1]) if parts[1].isdigit() else None)
+        elif parts[0] in ("w", "h", "top", "left"):
+            key_map = {"w": "width", "h": "height", "top": "top", "left": "left"}
+            set_style(key_map[parts[0]], int(parts[1]) if parts[1].isdigit() else None)
         elif parts[0]=="bg" and parts[1] in colors and parts[2] in colors[parts[1]]:
             set_style("background",hex_to_rgb(colors[parts[1]][parts[2]]))
         elif parts[0]=="text":
@@ -389,6 +390,19 @@ class UIBase:
     def get_style(self, key, default=None):
         value = self.computed.get(key)
         return default if value is None else value
+
+    def shift(self, dx, dy):
+        if self.box:
+            x, y, w, h = self.box
+            self.box = (x + dx, y + dy, w, h)
+        for child in self.children:
+            if hasattr(child, "shift"):
+                child.shift(dx, dy)
+
+    def shift_descendants(self, dx, dy):
+        for child in self.children:
+            if hasattr(child, "shift"):
+                child.shift(dx, dy)
 
     def compute_box(self):
         parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
@@ -444,7 +458,6 @@ class UIDiv(UIBase):
 
     def compute_box(self):
         parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
-        parent_h = self.parent.box[3] if self.parent and self.parent.box else 600
 
         width = int(self.get_style("width") or (parent_w if self.get_style("display")=="block" else 100))
         height = int(self.get_style("height") or 50)
@@ -453,19 +466,70 @@ class UIDiv(UIBase):
 
         self.box = (x, y, width, height)
 
-        offset_x = 0
-        offset_y = 0
+        child_specs = []
         for child in self.children:
             child.compute_box()
+            old_x = child.box[0] if child.box else 0
+            old_y = child.box[1] if child.box else 0
             cw = child.box[2] if child.box else 0
             ch = child.box[3] if child.box else 0
+            child_specs.append((child, old_x, old_y, cw, ch))
+
+        if child_specs:
+            gap = 10
+            justify = self.get_style("justify")
+            items = self.get_style("items")
 
             if self.flex_direction == "row":
-                child.box = (x + offset_x, y + (height - ch)//2, cw, ch)
-                offset_x += cw + 10
+                total_main = sum(spec[3] for spec in child_specs) + gap * (len(child_specs) - 1)
+                if justify == "center":
+                    cursor_main = x + (width - total_main) // 2
+                elif justify in ("end", "right"):
+                    cursor_main = x + (width - total_main)
+                else:
+                    cursor_main = x
+
+                for child, old_x, old_y, cw, ch in child_specs:
+                    if items == "center":
+                        cross = y + (height - ch) // 2
+                    elif items in ("end", "bottom"):
+                        cross = y + (height - ch)
+                    else:
+                        cross = y
+
+                    new_x, new_y = cursor_main, cross
+                    cursor_main += cw + gap
+
+                    child.box = (new_x, new_y, cw, ch)
+                    dx = new_x - old_x
+                    dy = new_y - old_y
+                    if (dx or dy) and hasattr(child, "shift_descendants"):
+                        child.shift_descendants(dx, dy)
             else:
-                child.box = (x + (width - cw)//2, y + offset_y, cw, ch)
-                offset_y += ch + 10
+                total_main = sum(spec[4] for spec in child_specs) + gap * (len(child_specs) - 1)
+                if justify == "center":
+                    cursor_main = y + (height - total_main) // 2
+                elif justify in ("end", "bottom"):
+                    cursor_main = y + (height - total_main)
+                else:
+                    cursor_main = y
+
+                for child, old_x, old_y, cw, ch in child_specs:
+                    if items == "center":
+                        cross = x + (width - cw) // 2
+                    elif items in ("end", "right"):
+                        cross = x + (width - cw)
+                    else:
+                        cross = x
+
+                    new_x, new_y = cross, cursor_main
+                    cursor_main += ch + gap
+
+                    child.box = (new_x, new_y, cw, ch)
+                    dx = new_x - old_x
+                    dy = new_y - old_y
+                    if (dx or dy) and hasattr(child, "shift_descendants"):
+                        child.shift_descendants(dx, dy)
 
         if self.flex_direction == "row" and self.get_style("height") is None:
             self.box = (x, y, width, max(height, max((child.box[3] for child in self.children), default=height)))
@@ -475,14 +539,23 @@ class UIDiv(UIBase):
         return self.box
 
     def handle_event(self, event):
+        # Open dropdowns get first priority and consume clicks outside/inside the menu.
+        for child in reversed(self.children):
+            if isinstance(child, UIDropdown) and child.is_open:
+                if child.handle_event(event):
+                    return True
+
         if self.on_click and event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = pygame.mouse.get_pos()
             x, y, w, h = self.box
             if x <= mx <= x + w and y <= my <= y + h:
                 self.on_click()
-        for child in self.children:
-            if hasattr(child, "handle_event"):
-                child.handle_event(event)
+                return True
+
+        for child in reversed(self.children):
+            if hasattr(child, "handle_event") and child.handle_event(event):
+                return True
+        return False
     def update_hover(self, mouse_pos):
         if not self.box:
             return
@@ -505,10 +578,15 @@ class UIDiv(UIBase):
         if bg:
             pygame.draw.rect(surface, bg, self.box, border_radius=self.radius or 0)
 
+        open_dropdowns = []
         for child in self.children:
+            if isinstance(child, UIDropdown) and child.is_open:
+                open_dropdowns.append(child)
+                continue
+
             if isinstance(child, UIText):
-                x = self.box[0] + (child.box[0] or 0)
-                y = self.box[1] + (child.box[1] or 0)
+                x = child.box[0] or 0
+                y = child.box[1] or 0
                 font_size = child.get_style("font_size", 16)
                 color = child.get_style("color") or (0, 0, 0)
                 font = get_cached_font(child.font_name, font_size)
@@ -518,6 +596,10 @@ class UIDiv(UIBase):
                 surface.blit(text_surface, (tx, ty))
             else:
                 child.render(surface)
+
+        # Render open dropdowns last so the menu appears above sibling controls.
+        for dropdown in open_dropdowns:
+            dropdown.render(surface)
 
 
 
@@ -548,6 +630,7 @@ class UIInput(UIBase):
             x, y, w, h = self.box
             if x <= mx <= x + w and y <= my <= y + h:
                 self.focused = True
+                return True
             else:
                 self.focused = False
 
@@ -564,6 +647,8 @@ class UIInput(UIBase):
             
             if self.on_change:
                 self.on_change(self.text)
+            return True
+        return False
 
     def update(self, dt):
         self.cursor_timer += dt
@@ -614,6 +699,125 @@ class UIInput(UIBase):
             cursor_y2 = y + h - 8
             pygame.draw.line(surface, (0, 0, 0), (cursor_x, cursor_y1), (cursor_x, cursor_y2), 2)
 
+
+class UIIconButton(UIDiv):
+    def __init__(self, on_click=None, styles="", label="i"):
+        base_styles = (
+            "w-26 h-26 bg-sky-500 rounded-full hover:bg-sky-400 "
+            "items-center flex flex-col justify-center font-arial"
+        )
+        merged_styles = f"{base_styles} {styles}".strip()
+        super().__init__(
+            styles=merged_styles,
+            children=[UIText(label, styles="text-neutral-50 text-sm font-arial text-center")],
+            on_click=on_click,
+        )
+
+
+class UIModal:
+    def __init__(self):
+        self.visible = False
+        self.title = ""
+        self.body = ""
+        self.panel_rect = None
+        self.close_rect = None
+
+    def is_open(self):
+        return self.visible
+
+    def open(self, title, body):
+        self.title = title or "Info"
+        self.body = body or ""
+        self.visible = True
+
+    def close(self):
+        self.visible = False
+
+    def _wrap_text(self, text, font, max_width):
+        lines = []
+        for paragraph in text.split("\n"):
+            words = paragraph.split()
+            if not words:
+                lines.append("")
+                continue
+
+            current = words[0]
+            for word in words[1:]:
+                trial = f"{current} {word}"
+                if font.size(trial)[0] <= max_width:
+                    current = trial
+                else:
+                    lines.append(current)
+                    current = word
+            lines.append(current)
+        return lines
+
+    def handle_event(self, event):
+        if not self.visible:
+            return False
+
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            self.close()
+            return True
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            mx, my = pygame.mouse.get_pos()
+
+            if self.close_rect and self.close_rect.collidepoint(mx, my):
+                self.close()
+                return True
+
+            if self.panel_rect and not self.panel_rect.collidepoint(mx, my):
+                self.close()
+                return True
+
+            return True
+
+        # Modal is open: consume remaining events to block underlying UI.
+        return True
+
+    def render(self, surface):
+        if not self.visible:
+            return
+
+        surface_width, surface_height = surface.get_size()
+        panel_width = min(620, surface_width - 80)
+        panel_height = min(360, surface_height - 80)
+        panel_x = (surface_width - panel_width) // 2
+        panel_y = (surface_height - panel_height) // 2
+
+        self.panel_rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
+        self.close_rect = pygame.Rect(panel_x + panel_width - 40, panel_y + 12, 28, 28)
+
+        overlay = pygame.Surface((surface_width, surface_height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 140))
+        surface.blit(overlay, (0, 0))
+
+        pygame.draw.rect(surface, (250, 250, 250), self.panel_rect, border_radius=12)
+        pygame.draw.rect(surface, (200, 200, 200), self.panel_rect, width=2, border_radius=12)
+
+        pygame.draw.rect(surface, (230, 230, 230), self.close_rect, border_radius=6)
+        close_font = get_cached_font("Arial", 18)
+        close_text = close_font.render("X", True, (60, 60, 60))
+        close_x = self.close_rect.x + (self.close_rect.width - close_text.get_width()) // 2
+        close_y = self.close_rect.y + (self.close_rect.height - close_text.get_height()) // 2
+        surface.blit(close_text, (close_x, close_y))
+
+        title_font = get_cached_font("Arial", 26)
+        body_font = get_cached_font("Arial", 18)
+
+        title_surface = title_font.render(self.title, True, (20, 20, 20))
+        surface.blit(title_surface, (panel_x + 20, panel_y + 20))
+
+        body_lines = self._wrap_text(self.body, body_font, panel_width - 40)
+        cursor_y = panel_y + 70
+        for line in body_lines:
+            if cursor_y > panel_y + panel_height - 30:
+                break
+            line_surface = body_font.render(line, True, (50, 50, 50))
+            surface.blit(line_surface, (panel_x + 20, cursor_y))
+            cursor_y += 24
+
 class UIDropdown(UIDiv):
     """Dropdown container. Children: UIDropdownTrigger, UIDropdownMenu"""
     def __init__(self, styles="", parent=None, children=None, on_click=None):
@@ -644,17 +848,26 @@ class UIDropdown(UIDiv):
                 tx, ty, tw, th = self.trigger.box
                 if tx <= mx <= tx + tw and ty <= my <= ty + th:
                     self.toggle()
-                    return
-            # Check if clicked outside dropdown when open
+                    return True
+
+            # While menu is open it owns the mouse event.
             if self.is_open:
                 if self.menu and self.menu.box:
                     mx2, my2, mw, mh = self.menu.box
-                    if not (mx2 <= mx <= mx2 + mw and my2 <= my <= my2 + mh):
-                        self.close()
-        # Pass events to children
+                    inside_menu = mx2 <= mx <= mx2 + mw and my2 <= my <= my2 + mh
+                    if inside_menu:
+                        for option in reversed(self.menu.children):
+                            if hasattr(option, "handle_event") and option.handle_event(event):
+                                return True
+                        return True
+
+                self.close()
+                return True
+
         for child in self.children:
-            if hasattr(child, "handle_event"):
-                child.handle_event(event)
+            if hasattr(child, "handle_event") and child.handle_event(event):
+                return True
+        return False
 
     def render(self, surface):
         if not self.box:
@@ -664,13 +877,6 @@ class UIDropdown(UIDiv):
             self.trigger.render(surface)
         # Render white overlay and menu when open
         if self.is_open:
-            # Draw white overlay over entire screen
-            overlay = pygame.Surface(surface.get_size())
-            overlay.fill((255, 255, 255))
-            surface.blit(overlay, (0, 0))
-            # Re-render trigger on top of overlay
-            if self.trigger:
-                self.trigger.render(surface)
             # Render menu
             if self.menu:
                 self.menu.render(surface)
@@ -685,8 +891,9 @@ class UIDropdownTrigger(UIDiv):
     def handle_event(self, event):
         # Trigger events are handled by parent UIDropdown
         for child in self.children:
-            if hasattr(child, "handle_event"):
-                child.handle_event(event)
+            if hasattr(child, "handle_event") and child.handle_event(event):
+                return True
+        return False
 
 
 class UIDropdownMenu(UIDiv):
@@ -706,8 +913,15 @@ class UIDropdownMenu(UIDiv):
         # Position menu below trigger if dropdown exists
         if self.dropdown and self.dropdown.trigger and self.dropdown.trigger.box:
             tx, ty, tw, th = self.dropdown.trigger.box
-            x, y, w, h = self.box
-            self.box = (tx, ty + th, w, h)
+            old_x, old_y, w, h = self.box
+            new_x, new_y = tx, ty + th
+            self.box = (new_x, new_y, w, h)
+            dx = new_x - old_x
+            dy = new_y - old_y
+            if dx or dy:
+                for child in self.children:
+                    if hasattr(child, "shift"):
+                        child.shift(dx, dy)
         return self.box
 
 
@@ -731,9 +945,11 @@ class UIDropdownOption(UIDiv):
                         self.menu.dropdown.close()
                     if self.on_click:
                         self.on_click()
+                    return True
         for child in self.children:
-            if hasattr(child, "handle_event"):
-                child.handle_event(event)
+            if hasattr(child, "handle_event") and child.handle_event(event):
+                return True
+        return False
 
 class Screen:
     def __init__(self,width,height):

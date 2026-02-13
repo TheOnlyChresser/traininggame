@@ -38,6 +38,7 @@ TorcHdata = {
         "BCEWithLogitsLoss":nn.BCEWithLogitsLoss,
         "CTCLoss":nn.CTCLoss,
         "KLDivLoss":nn.KLDivLoss,
+        "CrossEntropyLoss":nn.CrossEntropyLoss,
     },
     "aktFunktioner":{
         "ELU":nn.ELU,
@@ -46,5 +47,14 @@ TorcHdata = {
         "ReLU":nn.ReLU,
         "Softmax":nn.Softmax,
         "Tanh":nn.Tanh,
+    },
+    "optimizer":{
+        "Adam":optim.Adam,
+        "ASGD":optim.ASGD,
+        "RMSprop":optim.RMSprop,
+        "SGD":optim.SGD,
+        "RAdam":optim.RAdam,
+        "adagrad":optim.Adagrad
     }
 }
+
