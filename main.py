@@ -178,8 +178,8 @@ def build_setup():
     error_text = UIText("", styles="text-center font-arial text-base text-rose-500")
 
     layers_input = game_input("Antal lag (f.eks. 3)")
-    epochs_input = game_input("Epoker (f.eks. 3)")
-    lr_input = game_input("Laeringsrate (f.eks. 0.001)")
+    epochs_input = game_input("Epoker (tom = 3)")
+    lr_input = game_input("Læringsrate (tom = 0.001)")
 
     if config["layers_count"] > 0:
         layers_input.text = str(config["layers_count"])
@@ -379,7 +379,7 @@ def build_layers():
             make_info_row("Per-lag aktivering", "per_lag_aktivering"),
             activation_dropdown,
             game_button("Tilbage", go_back),
-            game_button("Naeste", go_next),
+            game_button("Næste", go_next),
             error_text,
         ]
     )
@@ -661,4 +661,6 @@ while running:
     pygame.display.update()
 
 pygame.quit()
+
+
 

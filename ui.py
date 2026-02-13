@@ -380,6 +380,20 @@ class UIBase:
         self.box=None
         if parent: parent.children.append(self)
 
+    def is_descendant_of(self, ancestor):
+        node = self
+        while node:
+            if node is ancestor:
+                return True
+            node = node.parent
+        return False
+
+    def is_render_allowed(self):
+        active = UIDropdown.active_dropdown if "UIDropdown" in globals() else None
+        if not active:
+            return True
+        return self.is_descendant_of(active)
+
     def update_hover(self,mouse_pos):
         if not self.box: return
         x,y,w,h=self.box
@@ -436,6 +450,8 @@ class UIText(UIBase):
 
 
     def render(self, surface):
+        if not self.is_render_allowed():
+            return
         font_size = self.get_style("font_size", 16)
         color = self.get_style("color") or (0, 0, 0)
         font = get_cached_font(self.font_name, font_size)
@@ -449,6 +465,8 @@ class UIDiv(UIBase):
     def __init__(self, styles="", parent=None, children=None, on_click=None):
         super().__init__(styles, parent)
         self.children = children or []
+        for child in self.children:
+            child.parent = self
         self.on_click = on_click
         self.radius = self.get_style("radius") or 0
         self.flex_direction = "row" 
@@ -574,6 +592,11 @@ class UIDiv(UIBase):
         if not self.box:
             self.compute_box()
 
+        if not self.is_render_allowed():
+            for child in self.children:
+                child.render(surface)
+            return
+
         bg = self.get_style("background")
         if bg:
             pygame.draw.rect(surface, bg, self.box, border_radius=self.radius or 0)
@@ -659,6 +682,9 @@ class UIInput(UIBase):
     def render(self, surface):
         if not self.box:
             self.compute_box()
+
+        if not self.is_render_allowed():
+            return
 
         x, y, w, h = self.box
 
@@ -820,6 +846,7 @@ class UIModal:
 
 class UIDropdown(UIDiv):
     """Dropdown container. Children: UIDropdownTrigger, UIDropdownMenu"""
+    active_dropdown = None
     def __init__(self, styles="", parent=None, children=None, on_click=None):
         super().__init__(styles, parent, children, on_click)
         self.is_open = False
@@ -830,17 +857,55 @@ class UIDropdown(UIDiv):
             if isinstance(child, UIDropdownTrigger):
                 self.trigger = child
                 child.dropdown = self
+                child.parent = self
             elif isinstance(child, UIDropdownMenu):
                 self.menu = child
                 child.dropdown = self
+                child.parent = self
+
+    def _layout_children(self):
+        if not self.box:
+            return
+        x, y, w, h = self.box
+        if self.trigger:
+            self.trigger.compute_box()
+            tw = self.trigger.box[2] if self.trigger.box else w
+            th = self.trigger.box[3] if self.trigger.box else 50
+            self.trigger.box = (x, y, tw, th)
+        if self.menu:
+            self.menu.compute_box()
+            mw = self.menu.box[2] if self.menu.box else w
+            mh = self.menu.box[3] if self.menu.box else 50
+            trigger_h = self.trigger.box[3] if self.trigger and self.trigger.box else 0
+            self.menu.box = (x, y + trigger_h, mw, mh)
+
+    def compute_box(self):
+        parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
+        width = int(self.get_style("width") or (parent_w if self.get_style("display") == "block" else 100))
+        height = int(self.get_style("height") or 50)
+        x = int(self.get_style("left") or 0)
+        y = int(self.get_style("top") or 0)
+        self.box = (x, y, width, height)
+        self._layout_children()
+        if self.get_style("height") is None and self.trigger and self.trigger.box:
+            self.box = (x, y, width, int(self.trigger.box[3]))
+            self._layout_children()
+        return self.box
 
     def toggle(self):
         self.is_open = not self.is_open
+        if self.is_open:
+            UIDropdown.active_dropdown = self
+        elif UIDropdown.active_dropdown is self:
+            UIDropdown.active_dropdown = None
 
     def close(self):
         self.is_open = False
+        if UIDropdown.active_dropdown is self:
+            UIDropdown.active_dropdown = None
 
     def handle_event(self, event):
+        self._layout_children()
         if event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = pygame.mouse.get_pos()
             # Check if clicked on trigger
@@ -872,10 +937,10 @@ class UIDropdown(UIDiv):
     def render(self, surface):
         if not self.box:
             self.compute_box()
-        # Render trigger
-        if self.trigger:
+        else:
+            self._layout_children()
+        if self.trigger and not self.is_open:
             self.trigger.render(surface)
-        # Render white overlay and menu when open
         if self.is_open:
             # Render menu
             if self.menu:
@@ -907,6 +972,7 @@ class UIDropdownMenu(UIDiv):
             if isinstance(child, UIDropdownOption):
                 self.options.append(child)
                 child.menu = self
+                child.parent = self
 
     def compute_box(self):
         super().compute_box()
