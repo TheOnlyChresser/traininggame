@@ -1,6 +1,7 @@
 SAFE_LAYER_TYPES = ["Flatten", "Linear", "Dropout"]
 NO_ACTIVATION = "Ingen"
 
+# Eksempeltekster brugt som hjælpehint i parameterfeltet pr. lag.
 LAYER_PARAM_TEMPLATES = {
     "Flatten": "",
     "Linear": "in_features=784,out_features=128",
@@ -12,6 +13,7 @@ LAYER_PARAM_TEMPLATES = {
     "LSTMCell": "input_size=28,hidden_size=64",
 }
 
+# Centralt ordlisteindhold til infopopups i opsætning/lag/resultatskærme.
 AI_INFO = {
     "antal_lag": {
         "title": "Antal lag",
@@ -92,6 +94,7 @@ AI_INFO = {
 
 
 def get_layer_info_key(layer_type):
+    # Mapper valgt lagtype til dedikeret ordlistepost, når den findes.
     if not layer_type:
         return "lagtype"
     candidate = f"layer_{layer_type.lower()}"
@@ -101,6 +104,7 @@ def get_layer_info_key(layer_type):
 
 
 def get_info_text(info_key):
+    # Returnerer infovinduesklar titel/brødtekst med eksempel tilføjet, når tilgængelig.
     info = AI_INFO.get(info_key)
     if not info:
         info = {
@@ -116,6 +120,7 @@ def get_info_text(info_key):
 
 
 def get_layer_param_placeholder(layer_type):
+    # Reserveværdi holder parameterfeltet brugbart for ukendte/egne lagnavne.
     return LAYER_PARAM_TEMPLATES.get(layer_type, "key=value")
 
 

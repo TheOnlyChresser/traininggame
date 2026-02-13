@@ -1,7 +1,7 @@
 import pygame
 from pygame.locals import GL_MULTISAMPLESAMPLES, GL_MULTISAMPLEBUFFERS
 
-# Font cache to avoid recreating fonts every frame
+# Skrifttypelager så fonte ikke genskabes i hvert billede.
 _font_cache = {}
 
 def get_cached_font(font_name, font_size):
@@ -314,6 +314,7 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip("#")
     return tuple(int(hex_color[i:i+2],16) for i in (0,2,4))
 
+# Fortolker tailwind-lignende stiltokens til egenskaber ved kørsel.
 def parse_classes(class_string):
     styles = {
         "display": None,
@@ -346,6 +347,7 @@ def parse_classes(class_string):
     for cls in class_string.split():
         is_hover = cls.startswith("hover:")
         cls_name = cls[6:] if is_hover else cls
+        # Hover-variationer gemmes separat og blandes først ind, når musen er over elementet.
         target = hover_styles if is_hover else styles
         parts = cls_name.split("-")
 
@@ -380,20 +382,6 @@ class UIBase:
         self.box=None
         if parent: parent.children.append(self)
 
-    def is_descendant_of(self, ancestor):
-        node = self
-        while node:
-            if node is ancestor:
-                return True
-            node = node.parent
-        return False
-
-    def is_render_allowed(self):
-        active = UIDropdown.active_dropdown if "UIDropdown" in globals() else None
-        if not active:
-            return True
-        return self.is_descendant_of(active)
-
     def update_hover(self,mouse_pos):
         if not self.box: return
         x,y,w,h=self.box
@@ -405,6 +393,7 @@ class UIBase:
         value = self.computed.get(key)
         return default if value is None else value
 
+    # Flytter denne node og alle efterkommere med delta-pixel.
     def shift(self, dx, dy):
         if self.box:
             x, y, w, h = self.box
@@ -413,6 +402,7 @@ class UIBase:
             if hasattr(child, "shift"):
                 child.shift(dx, dy)
 
+    # Flytter kun efterkommere; nyttigt når forælder allerede er flyttet.
     def shift_descendants(self, dx, dy):
         for child in self.children:
             if hasattr(child, "shift"):
@@ -450,8 +440,6 @@ class UIText(UIBase):
 
 
     def render(self, surface):
-        if not self.is_render_allowed():
-            return
         font_size = self.get_style("font_size", 16)
         color = self.get_style("color") or (0, 0, 0)
         font = get_cached_font(self.font_name, font_size)
@@ -475,6 +463,7 @@ class UIDiv(UIBase):
             self.flex_direction = "column"
 
     def compute_box(self):
+        # To-pass-opstilling: mål børn først, og placér dem derefter med flex-lignende regler.
         parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
 
         width = int(self.get_style("width") or (parent_w if self.get_style("display")=="block" else 100))
@@ -557,7 +546,7 @@ class UIDiv(UIBase):
         return self.box
 
     def handle_event(self, event):
-        # Open dropdowns get first priority and consume clicks outside/inside the menu.
+        # Åbne rullemenuer har første prioritet og sluger klik udenfor/indeni menuen.
         for child in reversed(self.children):
             if isinstance(child, UIDropdown) and child.is_open:
                 if child.handle_event(event):
@@ -592,11 +581,6 @@ class UIDiv(UIBase):
         if not self.box:
             self.compute_box()
 
-        if not self.is_render_allowed():
-            for child in self.children:
-                child.render(surface)
-            return
-
         bg = self.get_style("background")
         if bg:
             pygame.draw.rect(surface, bg, self.box, border_radius=self.radius or 0)
@@ -620,7 +604,7 @@ class UIDiv(UIBase):
             else:
                 child.render(surface)
 
-        # Render open dropdowns last so the menu appears above sibling controls.
+        # Tegn åbne rullemenuer til sidst, så menuen vises over søskende-kontroller.
         for dropdown in open_dropdowns:
             dropdown.render(surface)
 
@@ -683,20 +667,17 @@ class UIInput(UIBase):
         if not self.box:
             self.compute_box()
 
-        if not self.is_render_allowed():
-            return
-
         x, y, w, h = self.box
 
-        # Draw background
+        # Tegn baggrund
         bg = self.get_style("background") or (255, 255, 255)
         pygame.draw.rect(surface, bg, self.box, border_radius=self.radius)
 
-        # Draw border (highlighted if focused)
+        # Tegn kant (fremhævet ved fokus)
         border_color = (0, 120, 215) if self.focused else (200, 200, 200)
         pygame.draw.rect(surface, border_color, self.box, width=2, border_radius=self.radius)
 
-        # Draw text or placeholder
+        # Tegn tekst eller pladsholder
         font_size = self.get_style("font_size", 16)
         font = get_cached_font(self.font_name, font_size)
         
@@ -708,17 +689,17 @@ class UIInput(UIBase):
             placeholder_color = (150, 150, 150)
             text_surface = font.render(self.placeholder, True, placeholder_color)
 
-        # Center text vertically, align left with padding
+        # Centrer tekst lodret, venstrestil med indvendig margen
         tx = x + padding
         ty = y + (h - text_surface.get_height()) // 2
         
-        # Clip text to input bounds
+        # Klip tekst til input-feltets grænser
         clip_rect = pygame.Rect(x + padding, y, w - padding * 2, h)
         surface.set_clip(clip_rect)
         surface.blit(text_surface, (tx, ty))
         surface.set_clip(None)
 
-        # Draw cursor if focused
+        # Tegn markør ved fokus
         if self.focused and self.cursor_visible:
             cursor_x = tx + font.size(self.text)[0]
             cursor_y1 = y + 8
@@ -799,7 +780,7 @@ class UIModal:
 
             return True
 
-        # Modal is open: consume remaining events to block underlying UI.
+        # Modalen er åben: slug resterende hændelser for at blokere grænsefladen underneden.
         return True
 
     def render(self, surface):
@@ -816,6 +797,7 @@ class UIModal:
         self.close_rect = pygame.Rect(panel_x + panel_width - 40, panel_y + 12, 28, 28)
 
         overlay = pygame.Surface((surface_width, surface_height), pygame.SRCALPHA)
+        # Halvgennemsigtig baggrund gør fokus på modalen tydelig.
         overlay.fill((0, 0, 0, 140))
         surface.blit(overlay, (0, 0))
 
@@ -845,14 +827,13 @@ class UIModal:
             cursor_y += 24
 
 class UIDropdown(UIDiv):
-    """Dropdown container. Children: UIDropdownTrigger, UIDropdownMenu"""
-    active_dropdown = None
+    """Rullemenu-beholder. Børn: UIDropdownTrigger, UIDropdownMenu"""
     def __init__(self, styles="", parent=None, children=None, on_click=None):
         super().__init__(styles, parent, children, on_click)
         self.is_open = False
         self.trigger = None
         self.menu = None
-        # Find trigger and menu from children
+        # Find udløser og menu blandt børn.
         for child in self.children:
             if isinstance(child, UIDropdownTrigger):
                 self.trigger = child
@@ -864,58 +845,91 @@ class UIDropdown(UIDiv):
                 child.parent = self
 
     def _layout_children(self):
+        # Udløser ligger ved beholderens start; menu forankres lige under udløser.
         if not self.box:
             return
+
+        def place_child(child, new_box):
+            if child.box:
+                old_x, old_y = child.box[0], child.box[1]
+            else:
+                old_x, old_y = new_box[0], new_box[1]
+            child.box = new_box
+            dx = new_box[0] - old_x
+            dy = new_box[1] - old_y
+            if (dx or dy) and hasattr(child, "shift_descendants"):
+                child.shift_descendants(dx, dy)
+
         x, y, w, h = self.box
         if self.trigger:
             self.trigger.compute_box()
             tw = self.trigger.box[2] if self.trigger.box else w
             th = self.trigger.box[3] if self.trigger.box else 50
-            self.trigger.box = (x, y, tw, th)
+            place_child(self.trigger, (x, y, tw, th))
         if self.menu:
             self.menu.compute_box()
             mw = self.menu.box[2] if self.menu.box else w
             mh = self.menu.box[3] if self.menu.box else 50
             trigger_h = self.trigger.box[3] if self.trigger and self.trigger.box else 0
-            self.menu.box = (x, y + trigger_h, mw, mh)
+            place_child(self.menu, (x, y + trigger_h, mw, mh))
 
     def compute_box(self):
         parent_w = self.parent.box[2] if self.parent and self.parent.box else 800
-        width = int(self.get_style("width") or (parent_w if self.get_style("display") == "block" else 100))
-        height = int(self.get_style("height") or 50)
+        style_width = self.get_style("width")
+        style_height = self.get_style("height")
+        display_mode = self.get_style("display")
+
+        inferred_width = None
+        inferred_height = None
+        if self.trigger:
+            self.trigger.compute_box()
+            if self.trigger.box:
+                inferred_width = self.trigger.box[2]
+                inferred_height = self.trigger.box[3]
+
+        if style_width is not None:
+            width = int(style_width)
+        elif display_mode == "block":
+            width = int(parent_w)
+        elif inferred_width is not None:
+            width = int(inferred_width)
+        else:
+            width = 100
+
+        if style_height is not None:
+            height = int(style_height)
+        elif inferred_height is not None:
+            height = int(inferred_height)
+        else:
+            height = 50
+
         x = int(self.get_style("left") or 0)
         y = int(self.get_style("top") or 0)
         self.box = (x, y, width, height)
         self._layout_children()
-        if self.get_style("height") is None and self.trigger and self.trigger.box:
+        if style_height is None and self.trigger and self.trigger.box:
             self.box = (x, y, width, int(self.trigger.box[3]))
             self._layout_children()
         return self.box
 
     def toggle(self):
         self.is_open = not self.is_open
-        if self.is_open:
-            UIDropdown.active_dropdown = self
-        elif UIDropdown.active_dropdown is self:
-            UIDropdown.active_dropdown = None
 
     def close(self):
         self.is_open = False
-        if UIDropdown.active_dropdown is self:
-            UIDropdown.active_dropdown = None
 
     def handle_event(self, event):
         self._layout_children()
         if event.type == pygame.MOUSEBUTTONDOWN:
             mx, my = pygame.mouse.get_pos()
-            # Check if clicked on trigger
+            # Tjek om der klikkes på udløser.
             if self.trigger and self.trigger.box:
                 tx, ty, tw, th = self.trigger.box
                 if tx <= mx <= tx + tw and ty <= my <= ty + th:
                     self.toggle()
                     return True
 
-            # While menu is open it owns the mouse event.
+            # Mens menuen er åben, ejer den musehændelsen.
             if self.is_open:
                 if self.menu and self.menu.box:
                     mx2, my2, mw, mh = self.menu.box
@@ -939,22 +953,22 @@ class UIDropdown(UIDiv):
             self.compute_box()
         else:
             self._layout_children()
-        if self.trigger and not self.is_open:
+        if self.trigger:
             self.trigger.render(surface)
         if self.is_open:
-            # Render menu
+            # Tegn menuen.
             if self.menu:
                 self.menu.render(surface)
 
 
 class UIDropdownTrigger(UIDiv):
-    """Dropdown trigger button. Parent: UIDropdown"""
+    """Rullemenu-udløserknap. Forælder: UIDropdown"""
     def __init__(self, styles="", parent=None, children=None, on_click=None):
         super().__init__(styles, parent, children, on_click)
-        self.dropdown = None  # Set by parent UIDropdown
+        self.dropdown = None  # Sættes af overordnet UIDropdown.
 
     def handle_event(self, event):
-        # Trigger events are handled by parent UIDropdown
+        # Udløserhændelser håndteres af overordnet UIDropdown.
         for child in self.children:
             if hasattr(child, "handle_event") and child.handle_event(event):
                 return True
@@ -962,12 +976,12 @@ class UIDropdownTrigger(UIDiv):
 
 
 class UIDropdownMenu(UIDiv):
-    """Dropdown menu container. Parent: UIDropdown, Children: UIDropdownOption"""
+    """Rullemenu-beholder. Forælder: UIDropdown, børn: UIDropdownOption"""
     def __init__(self, styles="", parent=None, children=None, on_click=None):
         super().__init__(styles, parent, children, on_click)
-        self.dropdown = None  # Set by parent UIDropdown
+        self.dropdown = None  # Sættes af overordnet UIDropdown.
         self.options = []
-        # Find options from children
+        # Find valgmuligheder blandt børn.
         for child in self.children:
             if isinstance(child, UIDropdownOption):
                 self.options.append(child)
@@ -976,7 +990,7 @@ class UIDropdownMenu(UIDiv):
 
     def compute_box(self):
         super().compute_box()
-        # Position menu below trigger if dropdown exists
+        # Placér menu under udløser, hvis rullemenuen findes.
         if self.dropdown and self.dropdown.trigger and self.dropdown.trigger.box:
             tx, ty, tw, th = self.dropdown.trigger.box
             old_x, old_y, w, h = self.box
@@ -992,11 +1006,11 @@ class UIDropdownMenu(UIDiv):
 
 
 class UIDropdownOption(UIDiv):
-    """Dropdown menu option. Parent: UIDropdownMenu"""
+    """Rullemenuvalg. Forælder: UIDropdownMenu"""
     def __init__(self, value="", styles="", parent=None, children=None, on_click=None, on_select=None):
         super().__init__(styles, parent, children, on_click)
         self.value = value
-        self.menu = None  # Set by parent UIDropdownMenu
+        self.menu = None  # Sættes af overordnet UIDropdownMenu.
         self.on_select = on_select
 
     def handle_event(self, event):

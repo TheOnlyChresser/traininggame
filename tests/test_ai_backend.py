@@ -9,6 +9,7 @@ from data.ai_terms import NO_ACTIVATION
 
 
 def tiny_loaders(batch_size=4):
+    # Lille deterministisk datasamling, så tests er hurtige og stabile.
     torch.manual_seed(7)
     features = torch.randn(16, 1, 28, 28)
     labels = torch.randint(0, 10, (16,))
@@ -23,6 +24,7 @@ def tiny_loaders(batch_size=4):
 
 class BackendTests(unittest.TestCase):
     def test_parse_param_string_valid_values(self):
+        # Verificerer typekonvertering for int, float, tuple og bool.
         parsed = parse_param_string("out_features=128,p=0.2,kernel_size=(3,3),batch_first=True")
         self.assertEqual(parsed["out_features"], 128)
         self.assertEqual(parsed["p"], 0.2)
@@ -30,10 +32,12 @@ class BackendTests(unittest.TestCase):
         self.assertIs(parsed["batch_first"], True)
 
     def test_parse_param_string_invalid_format(self):
+        # Manglende '=' skal give en valideringsfejl.
         with self.assertRaises(ValueError):
             parse_param_string("out_features:128")
 
     def test_layer_instantiation_and_activation(self):
+        # Bekræfter at lag og aktivering oprettes i korrekt rækkefølge.
         model = build_sequential_model(
             [
                 {"type": "Flatten", "params": "", "activation": NO_ACTIVATION},
@@ -47,6 +51,7 @@ class BackendTests(unittest.TestCase):
         self.assertIn("akt_2_ReLU", names)
 
     def test_shape_validation_shows_flatten_hint(self):
+        # Linear uden Flatten skal give en hjælpsom form-fejl.
         model = build_sequential_model(
             [{"type": "Linear", "params": "in_features=784,out_features=10", "activation": NO_ACTIVATION}]
         )
@@ -55,6 +60,7 @@ class BackendTests(unittest.TestCase):
         self.assertIn("Flatten", str(context.exception))
 
     def test_training_progress_and_completion(self):
+        # Træning skal levere løbende fremdrift og ende med statusværdien "completed".
         train_loader, test_loader = tiny_loaders()
         updates = []
 
@@ -79,6 +85,7 @@ class BackendTests(unittest.TestCase):
         self.assertGreaterEqual(updates[-1]["progress"], 1.0)
 
     def test_training_cancel(self):
+        # Annulleringsevent skal stoppe træningen og returnere statusværdien "cancelled".
         train_loader, test_loader = tiny_loaders()
         cancel_event = threading.Event()
 

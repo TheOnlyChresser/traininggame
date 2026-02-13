@@ -26,6 +26,7 @@ from ui import (
 )
 
 
+# Fælles input-stil til opsætnings- og lagformularer.
 def game_input(placeholder):
     return UIInput(
         placeholder=placeholder,
@@ -33,6 +34,7 @@ def game_input(placeholder):
     )
 
 
+# Primær handlingsknap brugt på tværs af tilstande.
 def game_button(text, on_click):
     return UIDiv(
         styles="w-320 h-56 bg-sky-500 rounded-sm hover:bg-sky-400 items-center flex flex-col justify-center",
@@ -41,6 +43,7 @@ def game_button(text, on_click):
     )
 
 
+# Sekundær knapstil til skift og lettere handlinger.
 def game_secondary_button(text_widget, on_click):
     return UIDiv(
         styles="w-320 h-46 bg-neutral-200 rounded-sm hover:bg-neutral-300 items-center flex flex-col justify-center",
@@ -49,6 +52,7 @@ def game_secondary_button(text_widget, on_click):
     )
 
 
+# Tegner træningsfremdrift på resultatskærmen.
 def progress_bar(surface, value):
     clamped = max(0.0, min(1.0, value))
     bar_width = 420
@@ -61,6 +65,7 @@ def progress_bar(surface, value):
     pygame.draw.rect(surface, (70, 170, 90), (bar_x, bar_y, filled_width, bar_height), border_radius=6)
 
 
+# Enkel rullemenufabrik som holder label-tekst synkron med valg.
 def make_dropdown(options, placeholder, on_select):
     label = UIText(placeholder, styles="text-neutral-700 text-center")
     trigger = UIDropdownTrigger(
@@ -86,6 +91,7 @@ def make_dropdown(options, placeholder, on_select):
     return dropdown, label
 
 
+# Hjælperække til label + info-knap-par.
 def make_info_row(label_text, info_key_or_getter):
     def show_info():
         key = info_key_or_getter() if callable(info_key_or_getter) else info_key_or_getter
@@ -100,6 +106,7 @@ def make_info_row(label_text, info_key_or_getter):
     )
 
 
+# Ensartet talformatering til metrik-tekst.
 def format_number(value, digits=4):
     if value is None:
         return "-"
@@ -116,6 +123,7 @@ STATE_LAYERS = "layers"
 STATE_RESULTS = "results"
 state = STATE_MENU
 
+# Global konfiguration delt mellem opsætning, lagredigering og træningsstart.
 config = {
     "layers_count": 0,
     "epochs": 3,
@@ -139,6 +147,7 @@ layer_sync = lambda: None
 results_root = None
 results_widgets = {}
 
+# Tråd + kø-opsætning til ikke-blokerende træning i pygame-løkken.
 training_queue = queue.Queue()
 training_thread = None
 training_cancel_event = None
@@ -146,11 +155,13 @@ training_progress = 0.0
 training_result = None
 
 
+# Åbner infomodal for en given ordliste-nøgle.
 def open_info(info_key):
     title, body = get_info_text(info_key)
     info_modal.open(title, body)
 
 
+# Vælger bedste ordliste-nøgle for det lag, der redigeres nu.
 def current_layer_info_key():
     if not layer_configs:
         return "lagtype"
@@ -158,6 +169,7 @@ def current_layer_info_key():
     return get_layer_info_key(layer_type)
 
 
+# Sammensætning af hovedmenuen.
 def build_menu():
     root = UIDiv(styles="flex flex-col justify-center top-160 items-center w-800 h-600 bg-neutral-50")
     root.children.extend(
@@ -173,14 +185,16 @@ def build_menu():
     return root
 
 
+# Opsætningsskærm: globale træningsindstillinger og sikker/avanceret tilstand.
 def build_setup():
-    root = UIDiv(styles="w-800 h-1200 bg-neutral-50 flex flex-col top-10")
+    root = UIDiv(styles="w-800 h-1200 bg-neutral-50 flex flex-col items-center top-10")
     error_text = UIText("", styles="text-center font-arial text-base text-rose-500")
 
     layers_input = game_input("Antal lag (f.eks. 3)")
     epochs_input = game_input("Epoker (tom = 3)")
-    lr_input = game_input("Læringsrate (tom = 0.001)")
+    lr_input = game_input("Laeringsrate (tom = 0.001)")
 
+    # Forudfyld felter med tidligere valg, så brugeren kan justere uden at starte forfra.
     if config["layers_count"] > 0:
         layers_input.text = str(config["layers_count"])
     if config["epochs"] > 0:
@@ -207,6 +221,7 @@ def build_setup():
         advanced_text.text = "Avanceret tilstand: Til" if config["advanced_mode"] else "Avanceret tilstand: Fra"
 
     def go_next():
+        # Tidlig validering så efterfølgende lag/træning altid har gyldig tilstand.
         layers_text = layers_input.text.strip()
         epochs_text = epochs_input.text.strip()
         lr_text = lr_input.text.strip()
@@ -268,6 +283,7 @@ def build_setup():
     return root, [layers_input, epochs_input, lr_input], error_text
 
 
+# Initialiserer kladdetilstand pr. lag før lagredigering åbnes.
 def init_layers(count):
     global layer_configs, current_layer_index
     layer_configs = []
@@ -276,12 +292,14 @@ def init_layers(count):
     current_layer_index = 0
 
 
+# Lagredigeringsskærm for type/parametre/aktivering pr. trin.
 def build_layers():
-    root = UIDiv(styles="w-800 h-1400 bg-neutral-50 flex flex-col top-10")
+    root = UIDiv(styles="w-800 h-1400 bg-neutral-50 flex flex-col items-center top-10")
     title = UIText("", styles="w-330 h-34 text-neutral-800 text-xl font-arial text-center")
     error_text = UIText("", styles="text-center font-arial text-base text-rose-500")
     hint_text = UIText("", styles="w-700 h-48 text-center font-arial text-sm text-neutral-500")
 
+    # Avanceret tilstand viser hele lagerkataloget; ellers kun sikre startlag.
     if config.get("advanced_mode"):
         layer_type_options = list(TorcHdata["lagTyper"].keys())
     else:
@@ -309,6 +327,7 @@ def build_layers():
     params_input = game_input("key=value")
 
     def sync_layer_fields():
+        # Holder synlige felter synkroniseret med det aktive lagindeks.
         if not layer_configs:
             title.text = "Lag"
             layer_label.text = "Vaelg lagtype"
@@ -334,6 +353,7 @@ def build_layers():
         error_text.text = ""
 
     def save_current_layer():
+        # Gem fritekst-parametre før enhver navigation.
         layer_configs[current_layer_index]["params"] = params_input.text.strip()
 
     def go_back():
@@ -379,7 +399,7 @@ def build_layers():
             make_info_row("Per-lag aktivering", "per_lag_aktivering"),
             activation_dropdown,
             game_button("Tilbage", go_back),
-            game_button("Næste", go_next),
+            game_button("Naeste", go_next),
             error_text,
         ]
     )
@@ -388,6 +408,7 @@ def build_layers():
     return root, params_input, layer_label, activation_label, sync_layer_fields
 
 
+# Resultatskærm: løbende fremdrift + endelige metrikker og resumé.
 def build_results():
     root = UIDiv(styles="flex flex-col justify-center top-70 items-center w-800 h-780 bg-neutral-50")
 
@@ -445,6 +466,7 @@ def change_layer(index):
     layer_sync()
 
 
+# Genopbygningsfunktioner bruges ved tilstandsskift, så felter afspejler aktuel konfiguration.
 def rebuild_setup():
     global setup_root, setup_inputs, setup_error_text
     setup_root, setup_inputs, setup_error_text = build_setup()
@@ -460,6 +482,7 @@ def rebuild_results():
     results_root, results_widgets = build_results()
 
 
+# Tøm ventende fremdrifts-/resultathændelser ved start af nyt run.
 def clear_training_queue():
     while True:
         try:
@@ -468,6 +491,7 @@ def clear_training_queue():
             break
 
 
+# Viser modelresumé i et fast antal tekstlinjer.
 def apply_summary_lines(summary_text):
     lines = [line for line in summary_text.split("\n") if line.strip()]
     line_widgets = results_widgets.get("summary_lines", [])
@@ -476,6 +500,7 @@ def apply_summary_lines(summary_text):
         widget.text = lines[index] if index < len(lines) else ""
 
 
+# Starter træningsarbejder og nulstiller resultatfelter til indlæsningsstatus.
 def start_training():
     global training_thread, training_cancel_event, training_progress, training_result
 
@@ -493,6 +518,7 @@ def start_training():
 
     training_cancel_event = threading.Event()
 
+    # Kopiér lagkonfigurationen, så redigering i grænsefladen ikke ændrer aktiv træning.
     train_config = {
         "epochs": config["epochs"],
         "learning_rate": config["learning_rate"],
@@ -504,6 +530,7 @@ def start_training():
         training_queue.put({"type": "progress", "payload": payload})
 
     def worker():
+        # Kør træning i baggrunden og aflever resultatet tilbage til hovedløkken via køen.
         ai_runner = UserAI()
         result = ai_runner.train(
             train_config,
@@ -516,6 +543,7 @@ def start_training():
     training_thread.start()
 
 
+# Kooperativ annullering for kørende trænings-tråde.
 def cancel_training_if_running():
     global training_thread, training_cancel_event
 
@@ -528,6 +556,7 @@ def cancel_training_if_running():
     training_cancel_event = None
 
 
+# Henter fremdrifts-/resultatbeskeder fra køen og opdaterer visningstekster.
 def poll_training_updates():
     global training_progress, training_result, training_thread, training_cancel_event
 
@@ -539,6 +568,7 @@ def poll_training_updates():
 
         payload = message.get("payload", {})
 
+        # To beskedtyper: løbende fremdrift og endeligt resultat.
         if message.get("type") == "progress":
             training_progress = payload.get("progress", training_progress)
             epoch = payload.get("epoch", 0)
@@ -581,6 +611,7 @@ def poll_training_updates():
             training_cancel_event = None
 
 
+# Centraliseret tilstandsovergang med oprydnings-/genopbygningsregler.
 def switch_state(next_state):
     global state
 
@@ -597,6 +628,7 @@ def switch_state(next_state):
         rebuild_results()
 
 
+# Returnerer rodtræet for grænsefladen i nuværende tilstand.
 def active_root():
     if state == STATE_MENU:
         return menu_root
@@ -631,6 +663,7 @@ while running:
             break
 
         if info_modal.is_open() and info_modal.handle_event(event):
+            # Modalen ejer input, mens den er synlig.
             continue
 
         if root:
@@ -661,6 +694,7 @@ while running:
     pygame.display.update()
 
 pygame.quit()
+
 
 
 

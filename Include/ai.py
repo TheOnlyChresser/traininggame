@@ -17,19 +17,19 @@ NO_ACTIVATION = "Ingen"
 
 
 def _split_top_level_commas(raw: str) -> List[str]:
-    # Split kun på kommaer i top-niveau, så fx tuples/lister bevares samlet.
+    # Split kun ved komma i topniveau, så fx tupler/lister bevares samlet.
     parts: List[str] = []
     current: List[str] = []
     depth = 0
 
     for char in raw:
-        # Dybde tæller parentesniveau, så vi ved om komma er "inde i" et literal.
+        # Dybde tæller parentesniveau, så vi ved om komma er "inde i" en værdi.
         if char in "([{" :
             depth += 1
         elif char in ")]}":
             depth = max(0, depth - 1)
 
-        # Kun top-level kommaer må splitte parameterlisten.
+        # Kun komma i topniveau må splitte parameterlisten.
         if char == "," and depth == 0:
             segment = "".join(current).strip()
             if segment:
@@ -47,11 +47,11 @@ def _split_top_level_commas(raw: str) -> List[str]:
 
 
 def parse_param_value(value: str) -> Any:
-    # Parse i prioriteret rækkefølge: bool/null -> tal -> Python literal -> ren tekst.
+    # Fortolk i prioriteret rækkefølge: bool/null -> tal -> Python-værdi -> ren tekst.
     stripped = value.strip()
     lowered = stripped.lower()
 
-    # Standard bool/null aliases fra brugerinput.
+    # Standardaliaser for bool/null fra brugerinput.
     if lowered == "true":
         return True
     if lowered == "false":
@@ -60,7 +60,7 @@ def parse_param_value(value: str) -> Any:
         return None
 
     if stripped:
-        # Int før float, så "1" ikke ender som 1.0.
+        # Heltal før decimaltal, så "1" ikke ender som 1.0.
         try:
             return int(stripped)
         except ValueError:
@@ -71,7 +71,7 @@ def parse_param_value(value: str) -> Any:
         except ValueError:
             pass
 
-        # Tillad fx tuples/lister/dicts skrevet som Python literals.
+        # Tillad fx tupler/lister/ordbøger skrevet som Python-værdier.
         try:
             return ast.literal_eval(stripped)
         except (ValueError, SyntaxError):
@@ -81,7 +81,7 @@ def parse_param_value(value: str) -> Any:
 
 
 def parse_param_string(raw_params: str) -> Dict[str, Any]:
-    # Forventer formatet "key=value,key2=value2" fra UI-input.
+    # Forventer formatet "key=value,key2=value2" fra brugerfladens input.
     params: Dict[str, Any] = {}
     raw = (raw_params or "").strip()
     if not raw:
@@ -101,7 +101,7 @@ def parse_param_string(raw_params: str) -> Dict[str, Any]:
 
 
 def _friendly_model_error(error: Exception) -> str:
-    # Oversæt lave PyTorch-shapefejl til brugervenlige hints i UI.
+    # Oversæt lave PyTorch-formfejl til brugervenlige hints i grænsefladen.
     text = str(error)
 
     # Klassisk fejl når Flatten/in_features ikke matcher.
@@ -111,11 +111,11 @@ def _friendly_model_error(error: Exception) -> str:
             "Tip: Tilfoej Flatten foer Linear og kontroller in_features."
         )
 
-    # Conv-lag forventer typisk 4D input: (batch, kanal, højde, bredde).
+    # Conv-lag forventer typisk 4D-input: (batch, kanal, højde, bredde).
     if "Expected 4D" in text or "expected 4-dimensional input" in text.lower():
         return "Model validering fejlede: et lag forventer 4D input (batch, kanal, hoejde, bredde)."
 
-    # Dense/Linear-lag forventer typisk 2D input.
+    # Dense/Linear-lag forventer typisk 2D-input.
     if "Expected 2D" in text or "expected 2-dimensional input" in text.lower():
         return "Model validering fejlede: et lag forventer 2D input. Tip: brug Flatten foer et Dense/Linear lag."
 
@@ -126,18 +126,18 @@ def build_sequential_model(layer_defs: List[Dict[str, Any]]) -> nn.Sequential:
     if not layer_defs:
         raise ValueError("Du skal tilfoeje mindst et lag.")
 
-    # OrderedDict giver stabile lag-navne og rækkefølge i model summary.
+    # OrderedDict giver stabile lagnavne og rækkefølge i modelresuméet.
     ordered_layers: "collections.OrderedDict[str, nn.Module]" = collections.OrderedDict()
 
     for index, layer_def in enumerate(layer_defs, start=1):
-        # Valider lagtype tidligt, så fejl vises med præcis lag-indeks.
+        # Valider lagtype tidligt, så fejl vises med præcist lag-indeks.
         layer_type = (layer_def.get("type") or "").strip()
         if not layer_type:
             raise ValueError(f"Lag {index}: lagtype mangler.")
         if layer_type not in TorcHdata["lagTyper"]:
             raise ValueError(f"Lag {index}: ukendt lagtype '{layer_type}'.")
 
-        # Parametre kommer ind som tekst fra UI og parses til python-værdier.
+        # Parametre kommer ind som tekst fra grænsefladen og fortolkes til Python-værdier.
         params_raw = layer_def.get("params", "")
         try:
             params = parse_param_string(params_raw)
@@ -148,7 +148,7 @@ def build_sequential_model(layer_defs: List[Dict[str, Any]]) -> nn.Sequential:
         try:
             layer_instance = layer_constructor(**params)
         except TypeError as error:
-            # TypeError her betyder typisk forkert eller manglende nøgle-parametre.
+            # TypeError her betyder typisk forkerte eller manglende nøgleparametre.
             raise ValueError(
                 f"Lag {index} ({layer_type}): parametre passer ikke. Fejl: {error}"
             ) from error
@@ -165,7 +165,7 @@ def build_sequential_model(layer_defs: List[Dict[str, Any]]) -> nn.Sequential:
             try:
                 activation_instance = activation_constructor()
             except TypeError:
-                # Softmax kræver typisk en dimension; brug klasse-dimension som default.
+                # Softmax kræver typisk en dimension; brug klasse-dimension som standard.
                 if activation_name == "Softmax":
                     activation_instance = activation_constructor(dim=1)
                 else:
@@ -177,7 +177,7 @@ def build_sequential_model(layer_defs: List[Dict[str, Any]]) -> nn.Sequential:
 
 
 def validate_model_shape(model: nn.Module) -> None:
-    # Validér model tidligt med et dummy-input i MNIST-shape.
+    # Validér model tidligt med et testinput i MNIST-form.
     dummy_batch = torch.randn(1, 1, 28, 28)
     try:
         with torch.no_grad():
@@ -185,7 +185,7 @@ def validate_model_shape(model: nn.Module) -> None:
     except Exception as error:
         raise ValueError(_friendly_model_error(error)) from error
 
-    # Minimum 2D output kræves for klassifikation/evaluering senere.
+    # Minimum 2D-uddata kræves for klassifikation/evaluering senere.
     if output.ndim < 2:
         raise ValueError(
             "Model validering fejlede: output skal mindst vaere 2D (batch, klasser/features)."
@@ -201,7 +201,7 @@ def format_model_summary(model: nn.Module) -> str:
 
 
 def _mnist_loaders(batch_size: int = 32) -> tuple[DataLoader, DataLoader]:
-    # Standard loaders bruges når tests/custom loaders ikke leveres via config.
+    # Standardloadere bruges når tests/egne loadere ikke leveres via config.
     # Normalisering matcher gængse MNIST-træningsopsætninger.
     mnist_transform = transforms.Compose(
         [transforms.ToTensor(), transforms.Normalize((0.1307,), (0.3081,))]
@@ -220,11 +220,11 @@ def _compute_loss(
     output: torch.Tensor,
     target: torch.Tensor,
 ) -> torch.Tensor:
-    # Første forsøg: brug criterion direkte med rå target.
+    # Første forsøg: brug tabsfunktionen direkte med rå målværdier.
     try:
         return criterion(output, target)
     except Exception as error:
-        # Fallback: visse tab forventer one-hot labels i stedet for klasse-indeks.
+        # Reservevej: visse tab forventer one-hot-etiketter i stedet for klasse-indeks.
         if output.ndim == 2 and target.ndim == 1:
             one_hot_target = F.one_hot(target, num_classes=output.shape[1]).float()
             return criterion(output, one_hot_target)
@@ -232,7 +232,7 @@ def _compute_loss(
 
 
 class UserAI:
-    """Brugerdefineret AI-builder med stabil traenings-API."""
+    """Brugerdefineret AI-bygger med stabilt trænings-API."""
 
     def __init__(self, *_: Any, **__: Any):
         # Behold fleksibel signatur for bagudkompatibilitet med gammel kode.
@@ -244,7 +244,7 @@ class UserAI:
         progress_callback: Optional[ProgressCallback] = None,
         cancel_event: Optional[threading.Event] = None,
     ) -> Dict[str, Any]:
-        # History gemmer batch-niveau metrics til UI/progress-visning.
+        # Historik gemmer batch-målinger til grænsefladens fremdriftsvisning.
         history: List[Dict[str, Any]] = []
 
         def make_result(
@@ -254,7 +254,7 @@ class UserAI:
             model_summary: str = "",
             error: Optional[str] = None,
         ) -> Dict[str, Any]:
-            # Ensartet responsformat for completed/failed/cancelled.
+            # Ensartet svarformat for statusværdierne "completed", "failed" og "cancelled".
             return {
                 "status": status,
                 "final_loss": final_loss,
@@ -265,7 +265,7 @@ class UserAI:
             }
 
         try:
-            # Robust cast + validering, så UI-fejl returneres som data i stedet for crash.
+            # Robust konvertering + validering, så grænsefladefejl returneres som data i stedet for nedbrud.
             epochs = int(config.get("epochs", 0))
             learning_rate = float(config.get("learning_rate", 0.0))
             loss_name = (config.get("loss") or "").strip()
@@ -293,7 +293,7 @@ class UserAI:
             train_loader = config.get("train_loader")
             test_loader = config.get("test_loader")
             if train_loader is None or test_loader is None:
-                # Tillader dependency injection i tests, men har en sikker default.
+                # Tillader afhængighedsindsprøjtning i tests, men har en sikker standard.
                 train_loader, test_loader = _mnist_loaders(batch_size=32)
 
             total_batches = max(1, len(train_loader) * epochs)
@@ -302,8 +302,9 @@ class UserAI:
 
             model.train()
             for epoch in range(1, epochs + 1):
+                # Batch-løkke giver både historik og fin opløsning i fremdriftslinjen.
                 for batch_index, (data, target) in enumerate(train_loader, start=1):
-                    # Cancel check på hvert batch holder stop-responsen hurtig.
+                    # Annulleringskontrol på hvert batch holder stopresponsen hurtig.
                     if cancel_event is not None and cancel_event.is_set():
                         return make_result(
                             status="cancelled",
@@ -324,7 +325,7 @@ class UserAI:
                     completed_batches += 1
                     progress = min(1.0, completed_batches / total_batches)
 
-                    # Ét record pr. batch bruges både til historik og live progress.
+                    # Én post pr. batch bruges både til historik og løbende fremdrift.
                     step_record = {
                         "status": "running",
                         "epoch": epoch,
@@ -337,7 +338,7 @@ class UserAI:
                     history.append(step_record)
 
                     if progress_callback:
-                        # UI opdateres løbende for hver batch.
+                        # Grænsefladen opdateres løbende for hver batch.
                         progress_callback(step_record)
 
             model.eval()
@@ -345,6 +346,7 @@ class UserAI:
             total = 0
 
             with torch.no_grad():
+                # Evaluer på testdata uden gradienter for at holde det hurtigt og stabilt.
                 for data, target in test_loader:
                     if cancel_event is not None and cancel_event.is_set():
                         return make_result(
@@ -358,7 +360,7 @@ class UserAI:
                     output = model(data)
 
                     if output.ndim < 2:
-                        # Spring over ugyldige outputs i stedet for at crashe evaluering.
+                        # Spring over ugyldige outputs i stedet for at vælte evalueringen.
                         continue
 
                     prediction = output.argmax(dim=1)
@@ -375,5 +377,3 @@ class UserAI:
 
         except Exception as error:
             return make_result(status="failed", error=str(error))
-
-
