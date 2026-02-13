@@ -1,13 +1,13 @@
 # traininggame
 Et laeringsspil hvor man bygger og traener en simpel neural network-model i en Pygame UI.
 
-## Krav foer foerste koersel
+## Krav før første kørsel
 - Python 3.10 eller nyere
 - `pip` (foelger normalt med Python)
 - Internetforbindelse foerste gang: MNIST data downloades automatisk til `./data`
 
-## Foerste setup (Windows PowerShell)
-Koer kommandoerne fra projektets rodmappe:
+## Første setup (Windows PowerShell)
+Kør kommandoerne fra projektets rodmappe:
 
 ```powershell
 python -m venv .venv
@@ -27,7 +27,7 @@ Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned
 python main.py
 ```
 
-## Koer tests
+## Kør tests
 ```powershell
 python -m unittest discover -s tests
 ```
