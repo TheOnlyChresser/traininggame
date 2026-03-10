@@ -176,7 +176,7 @@ def build_menu():
         [
             UIDiv(
                 styles="h-90 w-500 text-3xl font-arial",
-                children=[UIText("Velkommen til AI-demo", styles="text-center font-arial text-5xl")],
+                children=[UIText("Velkommen til AI-demo", styles="font-arial text-5xl")],
             ),
             game_button("Byg din egen AI", lambda: switch_state(STATE_SETUP)),
             game_button("Afslut demo", lambda: pygame.event.post(pygame.event.Event(pygame.QUIT))),
@@ -187,7 +187,7 @@ def build_menu():
 
 # Opsætningsskærm: globale træningsindstillinger og sikker/avanceret tilstand.
 def build_setup():
-    root = UIDiv(styles="w-800 h-1200 bg-neutral-50 flex flex-col items-center top-10")
+    root = UIDiv(styles="w-800 h-1200 bg-neutral-50 flex flex-col items-center top-100000")
     error_text = UIText("", styles="text-center font-arial text-base text-rose-500")
 
     layers_input = game_input("Antal lag (f.eks. 3)")

@@ -48,8 +48,8 @@ def _split_top_level_commas(raw: str) -> List[str]:
 
 def parse_param_value(value: str) -> Any:
     # Fortolk i prioriteret rækkefølge: bool/null -> tal -> Python-værdi -> ren tekst.
-    stripped = value.strip()
-    lowered = stripped.lower()
+    stripped = value
+    lowered = stripped
 
     # Standardaliaser for bool/null fra brugerinput.
     if lowered == "true":
