@@ -113,7 +113,7 @@ def format_number(value, digits=4):
     return f"{value:.{digits}f}"
 
 
-screen = Screen(800, 760)
+screen = Screen(8000, 760)
 surface = screen.surface
 pygame.display.set_caption("AI spil")
 

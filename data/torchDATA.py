@@ -7,7 +7,7 @@ import math
 
 # Centralt torch-register brugt af grænsefladens rullemenuer og backend-modelbygger.
 # Nøgler er brugersynlige navne; værdier er konstruktorer fra torch.
-TorcHdata = {
+Torchdata = {
     "lagTyper":{
         # Hold denne liste praktisk til nuværende MNIST-fokuserede byggeflow.
         "Conv2d":nn.Conv2d,
